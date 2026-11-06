@@ -239,7 +239,11 @@ td.partner, td.co { color: var(--text); font-weight: 500 }
 .card { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 12px }
 .card .card-head h3 { font-size: 16px }
 .card dl { margin: 0; row-gap: 9px }
-.card dl { grid-template-columns: max-content minmax(0, 1fr); column-gap: 8px }
+.card dl.rowsA { grid-template-columns: minmax(0, 1fr) auto 76px; column-gap: 8px; align-items: baseline }
+.card dl.rowsA dd.num { text-align: right; font-family: var(--mono) }
+.card dl.rowsA dd.unit { text-align: left; color: var(--text3); font-size: 11.5px; white-space: nowrap }
+.card dl.rowsA .sub { margin-top: -6px }
+.card dl.rowsA dd.num.sub { font-size: 12px; color: var(--text2) }
 .card dt, .card dd { font-size: 13px; white-space: nowrap }
 .card dt { overflow: hidden; text-overflow: ellipsis }
 .card dd { text-align: right }
@@ -369,7 +373,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
         el("div", { class: "ov-co" }, el("span", { text: g.company }), g.people > 1 ? el("span", { class: "pill info", text: g.people + " people" }) : null,
           ...(g.tags || []).map(t => el("span", { class: "pill warn", text: t }))),
         el("div", { class: "ov-names", text: (g.names || []).join(" · ") || "–" }))) : [el("li", { class: "ov-names", text: "Nobody here right now." })])),
-      foot ? el("footer", { text: foot }) : null);
+      ...(foot ? [el("footer", { text: foot })] : []));
     document.body.append(dlg); dlg.showModal();
   }
 
@@ -379,22 +383,26 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     const n = v => v === "" || v == null ? "–" : String(v);
     const ex = c.exchange || { companies: 0, swaps: 0 };
     const people = c.reply_people || 0;
+    const recv = () => overlay(`Emails received · ${n(c.replies)} companies`, c.ov_received || [], `${people} people from ${n(c.replies)} companies`);
+    // [label, number, unit word, onClick, highlight]: numbers share one column, unit words follow in small grey text.
     const rows = [
       ["Emails scheduled", n(c.scheduled)],
       ["Emails sent", n(c.sent)],
-      ["Emails received", [`${n(c.replies)} companies`, `${people} people`], () => overlay(`Emails received · ${n(c.replies)} companies`, c.ov_received || [], `${people} people from ${n(c.replies)} companies`)],
-      ["Open threads", n(c.open), () => overlay(`Open threads · ${n(c.open)}`, c.ov_open || [])],
-      ["Needs our reply", n(c.needs_reply), () => overlay(`Needs our reply · ${n(c.needs_reply)}`, c.ov_reply || []), Number(c.needs_reply) > 0],
+      ["Emails received", n(c.replies), "companies", recv],
+      ["", String(people), "people", recv],
+      ["Open threads", n(c.open), "", () => overlay(`Open threads · ${n(c.open)}`, c.ov_open || [])],
+      ["Needs our reply", n(c.needs_reply), "", () => overlay(`Needs our reply · ${n(c.needs_reply)}`, c.ov_reply || []), Number(c.needs_reply) > 0],
       ["Needs client reply", n(c.partner_reply)],
-      ["Exchange", [`${ex.companies} companies`, `${ex.swaps} exchanges`]],
+      ["Exchange", String(ex.companies), "companies"],
+      ["", String(ex.swaps), "exchanges"],
     ];
-    const dl = el("dl");
-    for (let [label, v, open, hot] of rows) {
-      const dd = el("dd", { class: hot ? "hot" : null });
-      if (Array.isArray(v)) v = el("span", { class: "two" }, el("span", { text: v[0] }), el("small", { text: v[1] }));
-      if (open) { const b = el("button", { type: "button", class: "dd-btn", "aria-haspopup": "dialog" }, v, el("span", { class: "chev", "aria-hidden": "true", text: "›" })); b.onclick = open; dd.append(b); }
-      else dd.append(v);
-      dl.append(el("dt", { text: label }), dd);
+    const dl = el("dl", { class: "rowsA" });
+    for (const [label, v, unit, open, hot] of rows) {
+      const num = el("dd", { class: "num" + (hot ? " hot" : "") + (label ? "" : " sub") });
+      const u = el("dd", { class: "unit" + (label ? "" : " sub") }, unit || "", open && label ? el("span", { class: "chev", "aria-hidden": "true", text: " ›" }) : null);
+      if (open) { const b = el("button", { type: "button", class: "dd-btn", "aria-haspopup": "dialog", "aria-label": `${label || "people"}: ${v}, show list` }, v); b.onclick = open; num.append(b); u.style.cursor = "pointer"; u.onclick = open; }
+      else num.textContent = v;
+      dl.append(el("dt", { class: label ? null : "sub", text: label }), num, u);
     }
     card.append(dl);
     card.append(el("div", { class: "alerts card-foot" }, ...(c.alerts || []).map(a => el("span", { class: "pill warn", text: a }))));
