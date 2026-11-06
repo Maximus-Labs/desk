@@ -203,7 +203,9 @@ td.partner, td.co { color: var(--text); font-weight: 500 }
 .scroll2 { overflow: auto }
 
 .top2 { display: grid; grid-template-columns: minmax(0, 520px) minmax(0, 1fr); gap: 20px; align-items: start }
-.home-top { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start }
+.home-top { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: stretch }
+.home-top > .daybox { align-content: start } .home-top > #home-cal, .home-top .cal { height: 100%; box-sizing: border-box }
+.daybox ul { flex: 1 }
 .cal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 18px 18px 14px; display: grid; gap: 10px; min-width: 0 }
 .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px }
 .cal-head h3 { font-size: 15px; font-weight: 600; margin: 0 }
@@ -383,7 +385,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
       ["Emails received", [`${n(c.replies)} companies`, `${people} people`], () => overlay(`Emails received · ${n(c.replies)} companies`, c.ov_received || [], `${people} people from ${n(c.replies)} companies`)],
       ["Open threads", n(c.open), () => overlay(`Open threads · ${n(c.open)}`, c.ov_open || [])],
       ["Needs our reply", n(c.needs_reply), () => overlay(`Needs our reply · ${n(c.needs_reply)}`, c.ov_reply || []), Number(c.needs_reply) > 0],
-      ["Needs partner reply", n(c.partner_reply)],
+      ["Needs client reply", n(c.partner_reply)],
       ["Exchange", [`${ex.companies} companies`, `${ex.swaps} exchanges`]],
     ];
     const dl = el("dl");
@@ -475,7 +477,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
         el("td", { class: "when num", text: x.live || "–" })] },
     { key: "list_reply", label: "Needs our reply", hint: "They replied and the next message is ours, or we wrote and have had no reply for 5 days.",
       head: ["Company", "Contact", "Status", "Last message"], empty: "Nobody is waiting on us." },
-    { key: "list_waiting", label: "Needs partner reply", hint: "We replied or they passed it on; the next message is theirs.",
+    { key: "list_waiting", label: "Needs client reply", hint: "We sent the last email and are waiting for them. After 5 days with no answer it moves to Needs our reply.",
       head: ["Company", "Contact", "Status", "Last message"], empty: "No conversation is waiting on them." },
     { key: "list_paid", label: "Paid", hint: "They offered a paid placement instead of a link exchange.",
       head: ["Company", "Contact", "Status", "Last message"], empty: "No paid offers." },
