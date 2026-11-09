@@ -219,6 +219,7 @@ td.partner, td.co { color: var(--text); font-weight: 500 }
 .cal-day .c { display: flex; gap: 6px; font-family: var(--mono); font-size: 11.5px; line-height: 1; min-height: 11px }
 .cal-day .c .s { color: var(--sky) }
 .cal-day .c .r { color: var(--good) }
+.cal-day .c .f, .cal-foot .f, .daybox .f { color: var(--text3) }
 .cal-day.today { border-color: var(--sky) }
 .cal-day.sel { background: var(--raised) }
 .cal-day.future, .cal-day.future:hover { color: var(--text3); opacity: .45; cursor: default; background: transparent }
@@ -422,9 +423,14 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
   const todayIST = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
   const pretty = d => { const [y, m, dd] = d.split("-").map(Number); const w = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }); return `${w} ${dd} ${MON[m - 1].slice(0, 3)}`; };
   // Only the numbers above zero; nothing at all reads "no activity".
-  const pair = (s, r, ls = "", lr = "") => (s || r) ? [s ? el("b", { class: "s", text: `↗ ${s}${ls ? " " + ls : ""}` }) : null, s && r ? "  " : null,
-    r ? el("b", { class: "r", text: `↙ ${r}${lr ? " " + lr : ""}` }) : null] : [el("span", { text: "no activity" })];
-  const counts = (s, r) => [s ? el("span", { class: "s", text: "↗" + s }) : null, r ? el("span", { class: "r", text: "↙" + r }) : null];
+  // ↗ new emails · ↻ follow-ups · ↙ replies; only numbers above zero, "no activity" when all are zero.
+  const pair = (s, r, f = 0, words = false) => {
+    const parts = [[s, "s", "↗", "new"], [f, "f", "↻", "follow-ups"], [r, "r", "↙", "replies"]].filter(x => x[0]);
+    return parts.length ? parts.flatMap(([v, c, sym, w], i) => [i ? "  " : null, el("b", { class: c, text: `${sym} ${v}${words ? " " + w : ""}` })])
+      : [el("span", { text: "no activity" })];
+  };
+  const counts = (s, r, f) => [s ? el("span", { class: "s", text: "↗" + s }) : null, f ? el("span", { class: "f", text: "↻" + f }) : null,
+    r ? el("span", { class: "r", text: "↙" + r }) : null];
 
   // days: {"YYYY-MM-DD": [sent, replies]}; onPick(day) is called on load (today) and on each click.
   function calendar(box, days, onPick) {
@@ -439,39 +445,41 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
       if (ym >= today.slice(0, 7)) next.disabled = true;
       const grid = el("div", { class: "cal-grid" }, ...["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(w => el("div", { class: "cal-wd", text: w })));
       for (let i = 0; i < first; i++) grid.append(el("div", { class: "cal-day blank" }));
-      let ms = 0, mr = 0;
+      let ms = 0, mr = 0, mf = 0;
       for (let dd = 1; dd <= n; dd++) {
-        const day = `${ym}-${String(dd).padStart(2, "0")}`, [s, r] = days[day] || [0, 0], fut = day > today;
-        ms += s; mr += r;
+        const day = `${ym}-${String(dd).padStart(2, "0")}`, [s, r, f = 0] = days[day] || [0, 0, 0], fut = day > today;
+        ms += s; mr += r; mf += f;
         const b = el("button", { type: "button", class: "cal-day" + (day === today ? " today" : "") + (day === sel ? " sel" : "") + (fut ? " future" : ""),
-          "aria-label": `${pretty(day)}: ${s} sent, ${r} replies` }, el("span", { class: "n", text: String(dd) }), el("span", { class: "c" }, ...(fut ? [] : counts(s, r))));
+          "aria-label": `${pretty(day)}: ${s} new, ${f} follow-ups, ${r} replies` }, el("span", { class: "n", text: String(dd) }), el("span", { class: "c" }, ...(fut ? [] : counts(s, r, f))));
         if (fut) b.disabled = true; else b.onclick = () => { sel = day; draw(); onPick(day); };
         grid.append(b);
       }
-      const [ss, sr] = days[sel] || [0, 0];
+      const [ss, sr, sf = 0] = days[sel] || [0, 0, 0];
       box.replaceChildren(el("div", { class: "cal" },
         el("div", { class: "cal-head" }, el("h3", { text: `${MON[m - 1]} ${y}` }), el("span", {}, prev, " ", next)),
         grid,
         el("div", { class: "cal-foot" },
-          el("span", {}, pretty(sel) + ": ", ...pair(ss, sr, "sent", "replies")),
-          el("span", {}, "This month: ", ...pair(ms, mr)))));
+          el("span", {}, pretty(sel) + ": ", ...pair(ss, sr, sf, true)),
+          el("span", {}, "This month: ", ...pair(ms, mr, mf, true)))));
     };
     draw(); onPick(sel);
   }
 
   function homeDay(d, day) {
-    const per = d.clients.map(c => [c.name, ...((c.days || {})[day] || [0, 0])]);
-    const ts = per.reduce((a, x) => a + x[1], 0), tr = per.reduce((a, x) => a + x[2], 0);
+    const per = d.clients.map(c => [c.name, ...((c.days || {})[day] || [0, 0, 0])]);
+    const ts = per.reduce((a, x) => a + x[1], 0), tr = per.reduce((a, x) => a + x[2], 0), tf = per.reduce((a, x) => a + (x[3] || 0), 0);
+    const big = [[ts, "s", "↗", "new"], [tf, "f", "↻", "follow-ups"], [tr, "r", "↙", "replies"]].filter(x => x[0]);
     $("home-day").replaceChildren(el("h3", { text: `${pretty(day)} · all clients` }),
-      el("div", { class: "big" }, ...(ts || tr ? [ts ? el("span", { class: "s" }, "↗" + ts, el("small", { text: "sent" })) : null,
-        tr ? el("span", { class: "r" }, "↙" + tr, el("small", { text: "replies" })) : null] : [el("span", { class: "ph", text: "No emails this day" })])),
-      el("ul", {}, ...per.map(([name, s, r]) => el("li", {}, el("span", { text: name }), el("span", {}, ...(s || r ? [s ? el("b", { class: "s", text: "↗ " + s }) : null, r ? el("b", { class: "r", text: "↙ " + r }) : null] : [el("b", { class: "ph", text: "–" })]))))));
+      el("div", { class: "big" }, ...(big.length ? big.map(([v, c, sym, w]) => el("span", { class: c }, sym + v, el("small", { text: w })))
+        : [el("span", { class: "ph", text: "No emails this day" })])),
+      el("ul", {}, ...per.map(([name, s, r, f = 0]) => el("li", {}, el("span", { text: name }),
+        el("span", {}, ...(s || r || f ? counts(s, r, f).filter(Boolean).map(x => { x.style.fontWeight = 600; return x; }) : [el("b", { class: "ph", text: "–" })]))))));
   }
 
   function renderTeam(d) {
     $("cards").replaceChildren(...d.clients.map(c => card(c, BASE + "/" + c.slug + "/")));
     const all = {};
-    for (const c of d.clients) for (const [day, [s, r]] of Object.entries(c.days || {})) { const a = all[day] || (all[day] = [0, 0]); a[0] += s; a[1] += r; }
+    for (const c of d.clients) for (const [day, [s, r, f = 0]] of Object.entries(c.days || {})) { const a = all[day] || (all[day] = [0, 0, 0]); a[0] += s; a[1] += r; a[2] += f; }
     calendar($("home-cal"), all, day => homeDay(d, day));
     $("view-home").hidden = false;
   }
