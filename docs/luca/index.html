@@ -382,7 +382,9 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
 
   // Breakdown behind "Emails sent": the total equals the calendar's ↗ sum; bounces and follow-ups live here.
   function sentBox(c) {
-    const total = c.sent_total ?? c.sent ?? 0, b = c.bounced || 0;
+    // Delivered = Apollo's delivered count (the report's "Emails sent"); bounced = first emails sent minus delivered.
+    const total = c.sent_total ?? c.sent ?? 0, delivered = Number(c.sent) || 0;
+    const b = delivered ? Math.max(total - delivered, 0) : (c.bounced || 0);
     const row = (label, v, cls) => el("li", {}, el("div", { class: "ov-co" }, el("span", { text: label }), el("span", { class: "ov-num " + (cls || ""), text: String(v) })));
     const dlg = el("dialog", { class: "ov", "aria-label": "Emails sent" });
     const close = el("button", { type: "button", class: "ov-x", "aria-label": "Close", text: "✕" });
@@ -390,7 +392,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
     dlg.addEventListener("close", () => dlg.remove());
     dlg.append(el("header", {}, el("h3", { text: `Emails sent · ${total}` }), close),
-      el("ul", {}, row("Emails sent (first emails)", total, "s"), row("Delivered", Math.max(total - b, 0)), row("Bounced back", b, "bad"),
+      el("ul", {}, row("Emails sent (first emails)", total, "s"), row("Delivered", delivered || Math.max(total - b, 0)), row("Bounced back", b, "bad"),
         row("Follow-ups sent", c.follow_ups || 0, "f")),
       el("footer", { text: "Sent = every first email, the same total as the calendar's ↗. Follow-ups are counted separately." }));
     document.body.append(dlg); dlg.showModal();
