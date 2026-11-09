@@ -219,7 +219,8 @@ td.partner, td.co { color: var(--text); font-weight: 500 }
 .cal-day .c { display: flex; gap: 6px; font-family: var(--mono); font-size: 11.5px; line-height: 1; min-height: 11px }
 .cal-day .c .s { color: var(--sky) }
 .cal-day .c .r { color: var(--good) }
-.cal-day .c .f, .cal-foot .f, .daybox .f { color: var(--text3) }
+.cal-day .c .f, .cal-foot .f, .daybox .f, .ov-num.f { color: #f5a524 }
+.ov-num { font-family: var(--mono); margin-left: auto } .ov-num.s { color: var(--sky) } .ov-num.bad { color: var(--bad, #f05252) }
 .cal-day.today { border-color: var(--sky) }
 .cal-day.sel { background: var(--raised) }
 .cal-day.future, .cal-day.future:hover { color: var(--text3); opacity: .45; cursor: default; background: transparent }
@@ -379,7 +380,30 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     document.body.append(dlg); dlg.showModal();
   }
 
+  // Breakdown behind "Emails sent": the total equals the calendar's ↗ sum; bounces and follow-ups live here.
+  function sentBox(c) {
+    const total = c.sent_total ?? c.sent ?? 0, b = c.bounced || 0;
+    const row = (label, v, cls) => el("li", {}, el("div", { class: "ov-co" }, el("span", { text: label }), el("span", { class: "ov-num " + (cls || ""), text: String(v) })));
+    const dlg = el("dialog", { class: "ov", "aria-label": "Emails sent" });
+    const close = el("button", { type: "button", class: "ov-x", "aria-label": "Close", text: "✕" });
+    close.onclick = () => dlg.close();
+    dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener("close", () => dlg.remove());
+    dlg.append(el("header", {}, el("h3", { text: `Emails sent · ${total}` }), close),
+      el("ul", {}, row("Emails sent (first emails)", total, "s"), row("Delivered", Math.max(total - b, 0)), row("Bounced back", b, "bad"),
+        row("Follow-ups sent", c.follow_ups || 0, "f")),
+      el("footer", { text: "Sent = every first email, the same total as the calendar's ↗. Follow-ups are counted separately." }));
+    document.body.append(dlg); dlg.showModal();
+  }
+
   function card(c, href) {
+    // Older data (before the 15:10 run) lacks these totals: derive them from the calendar and the bounce alert.
+    const dv = Object.values(c.days || {});
+    if (c.sent_total == null && dv.length) c.sent_total = dv.reduce((a, v) => a + (v[0] || 0), 0);
+    if (c.follow_ups == null) c.follow_ups = dv.reduce((a, v) => a + (v[2] || 0), 0);
+    const bm = (c.alerts || []).map(a => /^Bounce rate (\d+)\//.exec(a)).find(Boolean);
+    if (c.bounced == null) c.bounced = bm ? Number(bm[1]) : 0;
+    c.alerts = (c.alerts || []).filter(a => !/^Bounce rate/.test(a));
     const card = el("article", { class: "card" });
     card.append(el("div", { class: "card-head" }, el("h3", {}, href ? el("a", { href, text: c.name }) : c.name)));
     const n = v => v === "" || v == null ? "–" : String(v);
@@ -389,7 +413,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     // [label, number, unit word, onClick, highlight]: numbers share one column, unit words follow in small grey text.
     const rows = [
       ["Emails scheduled", n(c.scheduled)],
-      ["Emails sent", n(c.sent)],
+      ["Emails sent", n(c.sent_total ?? c.sent), "", () => sentBox(c)],
       ["Emails received", n(c.replies), "companies", recv],
       ["", String(people), "people", recv],
       ["Open threads", n(c.open), "", () => overlay(`Open threads · ${n(c.open)}`, c.ov_open || [])],
@@ -425,7 +449,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
   // Only the numbers above zero; nothing at all reads "no activity".
   // ↗ new emails · ↻ follow-ups · ↙ replies; only numbers above zero, "no activity" when all are zero.
   const pair = (s, r, f = 0, words = false) => {
-    const parts = [[s, "s", "↗", "new"], [f, "f", "↻", "follow-ups"], [r, "r", "↙", "replies"]].filter(x => x[0]);
+    const parts = [[s, "s", "↗", "sent"], [f, "f", "↻", "follow-up"], [r, "r", "↙", "replies"]].filter(x => x[0]);
     return parts.length ? parts.flatMap(([v, c, sym, w], i) => [i ? "  " : null, el("b", { class: c, text: `${sym} ${v}${words ? " " + w : ""}` })])
       : [el("span", { text: "no activity" })];
   };
@@ -450,7 +474,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
         const day = `${ym}-${String(dd).padStart(2, "0")}`, [s, r, f = 0] = days[day] || [0, 0, 0], fut = day > today;
         ms += s; mr += r; mf += f;
         const b = el("button", { type: "button", class: "cal-day" + (day === today ? " today" : "") + (day === sel ? " sel" : "") + (fut ? " future" : ""),
-          "aria-label": `${pretty(day)}: ${s} new, ${f} follow-ups, ${r} replies` }, el("span", { class: "n", text: String(dd) }), el("span", { class: "c" }, ...(fut ? [] : counts(s, r, f))));
+          "aria-label": `${pretty(day)}: ${s} sent, ${f} follow-up, ${r} replies` }, el("span", { class: "n", text: String(dd) }), el("span", { class: "c" }, ...(fut ? [] : counts(s, r, f))));
         if (fut) b.disabled = true; else b.onclick = () => { sel = day; draw(); onPick(day); };
         grid.append(b);
       }
@@ -468,7 +492,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
   function homeDay(d, day) {
     const per = d.clients.map(c => [c.name, ...((c.days || {})[day] || [0, 0, 0])]);
     const ts = per.reduce((a, x) => a + x[1], 0), tr = per.reduce((a, x) => a + x[2], 0), tf = per.reduce((a, x) => a + (x[3] || 0), 0);
-    const big = [[ts, "s", "↗", "new"], [tf, "f", "↻", "follow-ups"], [tr, "r", "↙", "replies"]].filter(x => x[0]);
+    const big = [[ts, "s", "↗", "sent"], [tf, "f", "↻", "follow-up"], [tr, "r", "↙", "replies"]].filter(x => x[0]);
     $("home-day").replaceChildren(el("h3", { text: `${pretty(day)} · all clients` }),
       el("div", { class: "big" }, ...(big.length ? big.map(([v, c, sym, w]) => el("span", { class: c }, sym + v, el("small", { text: w })))
         : [el("span", { class: "ph", text: "No emails this day" })])),
