@@ -449,14 +449,13 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
   const todayIST = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
   const pretty = d => { const [y, m, dd] = d.split("-").map(Number); const w = new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }); return `${w} ${dd} ${MON[m - 1].slice(0, 3)}`; };
   // Only the numbers above zero; nothing at all reads "no activity".
-  // ↗ new emails · ↻ follow-ups · ↙ replies; only numbers above zero, "no activity" when all are zero.
+  // ↗ sent · ↙ replies; only numbers above zero, "no activity" when both are zero.
   const pair = (s, r, f = 0, words = false) => {
-    const parts = [[s, "s", "↗", "sent"], [f, "f", "↻", "follow-up"], [r, "r", "↙", "replies"]].filter(x => x[0]);
+    const parts = [[s, "s", "↗", "sent"], [r, "r", "↙", "replies"]].filter(x => x[0]);
     return parts.length ? parts.flatMap(([v, c, sym, w], i) => [i ? "  " : null, el("b", { class: c, text: `${sym} ${v}${words ? " " + w : ""}` })])
       : [el("span", { text: "no activity" })];
   };
-  const counts = (s, r, f) => [s ? el("span", { class: "s", text: "↗" + s }) : null, f ? el("span", { class: "f", text: "↻" + f }) : null,
-    r ? el("span", { class: "r", text: "↙" + r }) : null];
+  const counts = (s, r) => [s ? el("span", { class: "s", text: "↗" + s }) : null, r ? el("span", { class: "r", text: "↙" + r }) : null];
 
   // days: {"YYYY-MM-DD": [sent, replies]}; onPick(day) is called on load (today) and on each click.
   function calendar(box, days, onPick) {
@@ -476,7 +475,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
         const day = `${ym}-${String(dd).padStart(2, "0")}`, [s, r, f = 0] = days[day] || [0, 0, 0], fut = day > today;
         ms += s; mr += r; mf += f;
         const b = el("button", { type: "button", class: "cal-day" + (day === today ? " today" : "") + (day === sel ? " sel" : "") + (fut ? " future" : ""),
-          "aria-label": `${pretty(day)}: ${s} sent, ${f} follow-up, ${r} replies` }, el("span", { class: "n", text: String(dd) }), el("span", { class: "c" }, ...(fut ? [] : counts(s, r, f))));
+          "aria-label": `${pretty(day)}: ${s} sent, ${r} replies` }, el("span", { class: "n", text: String(dd) }), el("span", { class: "c" }, ...(fut ? [] : counts(s, r))));
         if (fut) b.disabled = true; else b.onclick = () => { sel = day; draw(); onPick(day); };
         grid.append(b);
       }
@@ -494,12 +493,12 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
   function homeDay(d, day) {
     const per = d.clients.map(c => [c.name, ...((c.days || {})[day] || [0, 0, 0])]);
     const ts = per.reduce((a, x) => a + x[1], 0), tr = per.reduce((a, x) => a + x[2], 0), tf = per.reduce((a, x) => a + (x[3] || 0), 0);
-    const big = [[ts, "s", "↗", "sent"], [tf, "f", "↻", "follow-up"], [tr, "r", "↙", "replies"]].filter(x => x[0]);
+    const big = [[ts, "s", "↗", "sent"], [tr, "r", "↙", "replies"]].filter(x => x[0]);
     $("home-day").replaceChildren(el("h3", { text: `${pretty(day)} · all clients` }),
       el("div", { class: "big" }, ...(big.length ? big.map(([v, c, sym, w]) => el("span", { class: c }, sym + v, el("small", { text: w })))
         : [el("span", { class: "ph", text: "No emails this day" })])),
       el("ul", {}, ...per.map(([name, s, r, f = 0]) => el("li", {}, el("span", { text: name }),
-        el("span", {}, ...(s || r || f ? counts(s, r, f).filter(Boolean).map(x => { x.style.fontWeight = 600; return x; }) : [el("b", { class: "ph", text: "–" })]))))));
+        el("span", {}, ...(s || r ? counts(s, r).filter(Boolean).map(x => { x.style.fontWeight = 600; return x; }) : [el("b", { class: "ph", text: "–" })]))))));
   }
 
   function renderTeam(d) {
@@ -524,7 +523,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
       head: ["Company", "Contact", "Status", "Last message"], empty: "No conversation is waiting on them." },
     { key: "list_paid", label: "Paid", hint: "They offered a paid placement instead of a link exchange.",
       head: ["Company", "Contact", "Status", "Last message"], empty: "No paid offers." },
-    { key: "list_others", label: "Others", hint: "Not going ahead: declined, not a fit, or the email bounced.",
+    { key: "list_others", label: "Others", hint: "Not going ahead: declined, not a fit, bounced, or a partnership offer we are not taking up now.",
       head: ["Company", "Contact", "Status", "Last message"], empty: "Nothing here." },
   ];
   const convRow = (x, key) => [el("td", { class: "co", text: x.company }), el("td", { text: x.contact || "–" }),
