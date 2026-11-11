@@ -312,6 +312,10 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
 @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
 @media (max-width: 480px) { .tile .tv { font-size: 21px } .perf { padding: 14px 12px } }
 .navbtn .count.zero { background: var(--raised); color: var(--text3); box-shadow: inset 0 0 0 1px var(--line) }
+.src-sum { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px }
+.src-chip { display: flex; align-items: baseline; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px }
+.src-chip b { font-family: var(--mono); font-size: 18px; font-weight: 500 }
+.src-chip span { font-size: 13px; color: var(--text) } .src-chip small { color: var(--text3); font-size: 12px }
 </style>
 </head>
 <body>
@@ -364,9 +368,11 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
       </section>
       <section aria-labelledby="h-fills">
         <div class="sec-head"><h2 id="h-fills">Refill log</h2><span class="hint" id="fills-when"></span></div>
+        <p class="hint">Domains put into the sequence, by the source they came from. Use it to see which source gives the most coverage.</p>
+        <div class="src-sum" id="src-sum"></div>
         <div class="table-wrap scroll2" id="fills-wrap">
           <table>
-            <thead><tr><th>Date &amp; time</th><th>Source</th><th>Companies added</th><th>Emails scheduled</th><th>Waiting</th><th>Left</th></tr></thead>
+            <thead><tr><th>Date &amp; time</th><th>Source</th><th>Domains added to sequence</th></tr></thead>
             <tbody id="fills"></tbody>
           </table>
         </div>
@@ -703,14 +709,14 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     }));
     show(current);
     $("fills-when").textContent = d.updated ? `Last refreshed ${d.updated} IST` : "";
-    const fills = c.fills || [];
-    const dash = v => (v === "" || v == null) ? "–" : String(v);
+    const fills = c.fills || [], srcs = c.sources || [];
+    $("src-sum").replaceChildren(...srcs.map(t => el("div", { class: "src-chip" }, el("b", { text: String(t.domains) }),
+      el("span", {}, t.source, el("small", { text: ` domains · last ${t.last}` })))));
     $("fills").replaceChildren(...(fills.length ? fills.map(f => el("tr", {},
       el("td", { class: "when num", text: f.date + (f.time ? ", " + f.time : "") }, f.time_est ? el("small", { class: "ph", text: "daily refill" }) : null),
-      el("td", {}, f.source ? f.source : el("span", { class: "ph", text: Number(f.added) ? "not in tracker" : "nothing added" })),
-      el("td", { class: "num", text: dash(f.companies) }),
-      el("td", { class: "num strong", text: dash(f.added !== "" ? f.added : f.people) }), el("td", { class: "num", text: dash(f.waiting) }), el("td", { class: "num", text: dash(f.left) }))) :
-      [empty(6, "No refills logged yet.")]));
+      el("td", { class: "co", text: f.source }),
+      el("td", { class: "num strong", text: String(f.domains) }))) :
+      [empty(3, "No domains added yet.")]));
     $("view-client").hidden = false;
     requestAnimationFrame(() => {   // show the header and two rows; scroll for the rest
       const w = $("fills-wrap"), rs = w.querySelectorAll("tbody tr");
