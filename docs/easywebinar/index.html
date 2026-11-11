@@ -395,7 +395,7 @@ table.led td.muted { color: var(--text3) }
       </section>
       <section aria-labelledby="h-fills">
         <div class="sec-head"><h2 id="h-fills">Refill log</h2><span class="hint" id="fills-when"></span></div>
-        <p class="hint">Each source: when domains went into the sequence and how many. Ledger: companies queued before, added, emailed for the first time, and left after — so a day with fewer than 10 sends shows why.</p>
+        <p class="hint">Domains added to the sequence from each source, and the queue of companies not yet emailed before and after each day.</p>
         <div class="src-sum" id="src-sum"></div>
         <div class="table-wrap scroll2" id="fills-wrap">
           <table class="led">
@@ -801,23 +801,20 @@ table.led td.muted { color: var(--text3) }
     const dates = led.length ? led.map(r => r.date) : [...new Set(fills.map(f => f.date))].sort().reverse();
     const lrow = Object.fromEntries(led.map(r => [r.date, r]));
     $("fills-head").replaceChildren(
-      el("tr", {}, el("th", { rowspan: "2", text: "Date" }),
-        ...names.map(nm => el("th", { colspan: "2", class: "grp gs" }, srcLabel(nm))),
-        el("th", { colspan: "6", class: "grp gs", text: "Ledger · companies queued" })),
-      el("tr", {}, ...names.flatMap(() => [el("th", { class: "gs", text: "Date & time" }), el("th", { text: "Added" })]),
-        ...["Before", "+ Added", "− Emailed", "After", "Emails sent", "Note"].map((h, k) => el("th", { class: k ? "" : "gs", text: h }))));
+      el("tr", {}, el("th", { rowspan: "2", text: "Date & time" }),
+        ...names.map(nm => el("th", { class: "grp gs" }, srcLabel(nm))),
+        el("th", { colspan: "2", class: "grp gs", text: "Ledger · companies queued" })),
+      el("tr", {}, ...names.map(() => el("th", { class: "gs", text: "Added" })),
+        el("th", { class: "gs", text: "Before" }), el("th", { text: "After" })));
     const dash = v => v == null ? "–" : String(v);
     $("fills").replaceChildren(...(dates.length ? dates.map(d => {
-      const r = lrow[d];
-      return el("tr", {}, el("td", { class: "when num", text: pretty(d) }),
-        ...names.flatMap(nm => { const f = by[d + "|" + nm];
-          return f ? [el("td", { class: "when num gs", text: f.date + (f.time ? ", " + f.time : "") }), el("td", { class: "num strong", text: String(f.domains) })]
-                   : [el("td", { class: "muted gs", text: "–" }), el("td", { class: "muted", text: "–" })]; }),
-        el("td", { class: "num gs", text: dash(r && r.before) }), el("td", { class: "num", text: r ? (r.added ? "+" + r.added : "0") : "–" }),
-        el("td", { class: "num", text: r ? (r.emailed ? "−" + r.emailed : "0") : "–" }), el("td", { class: "num strong" + (r && r.after < 0 ? " bad" : ""), text: dash(r && r.after) }),
-        el("td", { class: "num", text: dash(r && r.sent) }),
-        el("td", { class: r && /Under|Nothing/.test(r.note) ? "warn" : "muted", text: r ? (r.note || "OK") : "" }));
-    }) : [empty(2 + names.length * 2 + 5, (c.fills || []).length && !c.sources ? "The source breakdown appears after the next report." : "No domains added yet.")]));
+      const r = lrow[d], tm = fills.find(f => f.date === d && f.time);
+      return el("tr", {}, el("td", { class: "when num", text: pretty(d) + (tm ? ", " + tm.time : "") }),
+        ...names.map(nm => { const f = by[d + "|" + nm];
+          return f ? el("td", { class: "num strong gs", text: "+" + f.domains }) : el("td", { class: "muted gs", text: "–" }); }),
+        el("td", { class: "num gs", text: dash(r && r.before) }),
+        el("td", { class: "num strong" + (r && r.after < 0 ? " bad" : ""), text: dash(r && r.after) }));
+    }) : [empty(3 + names.length, (c.fills || []).length && !c.sources ? "The source breakdown appears after the next report." : "No domains added yet.")]));
     $("view-client").hidden = false;
     requestAnimationFrame(() => {   // show the header and six rows; scroll for the rest
       const w = $("fills-wrap"), rs = [...w.querySelectorAll("tbody tr")];
