@@ -316,6 +316,32 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
 .src-chip { display: flex; align-items: baseline; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 9px 14px }
 .src-chip b { font-family: var(--mono); font-size: 18px; font-weight: 500 }
 .src-chip span { font-size: 13px; color: var(--text) } .src-chip small { color: var(--text3); font-size: 12px }
+.tile, .tile .box { border-radius: 0 }
+.cp { display: inline-flex; border: 1px solid var(--line); background: var(--raised) }
+.cp button { font: inherit; font-size: 11.5px; padding: 3px 9px; border: 0; background: transparent; color: var(--text3); cursor: pointer }
+.cp button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--line) }
+.queue { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px 18px; display: grid; gap: 12px }
+.queue-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline }
+.queue-head h3 { margin: 0; font-size: 15px } .queue-head span { font-size: 12.5px; color: var(--text3) }
+.queue-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px }
+.q { display: grid; gap: 4px; padding: 12px 14px; background: var(--raised); border: 1px solid var(--line); color: var(--text2); font-size: 13px; text-decoration: none }
+.q:hover { border-color: var(--text3); text-decoration: none }
+.q b { font-family: var(--mono); font-size: 26px; font-weight: 500; color: var(--text) }
+.q small { color: var(--text3); font-size: 11.5px }
+.q.low { border-color: rgba(255,107,107,.45) } .q.low b { color: var(--bad) ; animation: blink 1s steps(2, start) infinite }
+@keyframes blink { 50% { opacity: .2 } }
+@media (prefers-reduced-motion: reduce) { .q.low b { animation: none } }
+.logo { width: 16px; height: 16px; border-radius: 3px; vertical-align: -3px; margin-right: 7px; background: #fff }
+.logo.none { display: inline-grid; place-items: center; background: var(--raised); color: var(--text3); font-size: 10px; box-shadow: inset 0 0 0 1px var(--line) }
+table.led th, table.led td { white-space: nowrap }
+table.led thead tr:first-child th { text-align: left; border-bottom: 1px solid var(--line) }
+table.led th.grp { color: var(--text); text-transform: none; letter-spacing: 0; font-family: inherit; font-size: 13px; font-weight: 600 }
+table.led td.gs, table.led th.gs { border-left: 1px solid var(--line) }
+table.led td.warn { color: var(--warn) } table.led td.bad { color: var(--bad) }
+table.led td.muted { color: var(--text3) }
+.copy-btn { font: inherit; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); background: var(--raised); color: var(--text); cursor: pointer; border-radius: var(--r-pill) }
+.copy-btn:hover { border-color: var(--text3) }
+.st-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap }
 </style>
 </head>
 <body>
@@ -341,6 +367,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
       <section aria-label="Emails per day">
         <div class="home-top"><div class="daybox" id="home-day"></div><div id="home-cal"></div></div>
       </section>
+      <section aria-label="Emails scheduled"><div id="home-queue"></div></section>
       <section aria-label="Performance"><div id="home-perf"></div></section>
       <section aria-label="Clients"><div class="cards" id="cards"></div></section>
     </div>
@@ -358,7 +385,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
           <h2 id="h-st">Outreach status</h2>
           <div class="seg" role="tablist" aria-label="Outreach status" id="seg"></div>
         </div>
-        <p class="hint" id="st-hint"></p>
+        <div class="st-tools"><p class="hint" id="st-hint"></p><button type="button" class="copy-btn" id="copy-ex" hidden>Copy table</button></div>
         <div class="table-wrap">
           <table>
             <thead id="st-head"></thead>
@@ -368,11 +395,11 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
       </section>
       <section aria-labelledby="h-fills">
         <div class="sec-head"><h2 id="h-fills">Refill log</h2><span class="hint" id="fills-when"></span></div>
-        <p class="hint">Domains put into the sequence, by the source they came from. Use it to see which source gives the most coverage.</p>
+        <p class="hint">Each source: when domains went into the sequence and how many. Ledger: companies queued before, added, emailed for the first time, and left after — so a day with fewer than 10 sends shows why.</p>
         <div class="src-sum" id="src-sum"></div>
         <div class="table-wrap scroll2" id="fills-wrap">
-          <table>
-            <thead><tr><th>Date &amp; time</th><th>Source</th><th>Domains added to sequence</th></tr></thead>
+          <table class="led">
+            <thead id="fills-head"></thead>
             <tbody id="fills"></tbody>
           </table>
         </div>
@@ -437,8 +464,15 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     document.body.append(dlg); dlg.showModal();
   }
 
+  // Companies / People switch shared by every card (remembered in this browser).
+  let CP = "companies"; try { CP = localStorage.getItem("cp") || "companies"; } catch (e) {}
+  const cardDraws = [];
+  const setCP = m => { CP = m; try { localStorage.setItem("cp", m); } catch (e) {} cardDraws.forEach(f => f()); };
+  const peopleIn = list => (list || []).reduce((a, g) => a + (g.people || 0), 0);
+  const namesIn = list => (list || []).reduce((a, x) => a + Math.max(1, String(x.contact || "").split(" · ").filter(Boolean).length), 0);
+
   function card(c, href) {
-    // Older data (before the 15:10 run) lacks these totals: derive them from the calendar and the bounce alert.
+    // Older data lacks these totals: derive them from the calendar and the bounce alert.
     const dv = Object.values(c.days || {});
     if (c.sent_total == null && dv.length) c.sent_total = dv.reduce((a, v) => a + (v[0] || 0), 0);
     if (c.follow_ups == null) c.follow_ups = dv.reduce((a, v) => a + (v[2] || 0), 0);
@@ -446,34 +480,72 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     if (c.bounced == null) c.bounced = bm ? Number(bm[1]) : 0;
     c.alerts = (c.alerts || []).filter(a => !/^Bounce rate/.test(a));
     const card = el("article", { class: "card" });
-    card.append(el("div", { class: "card-head" }, el("h3", {}, href ? el("a", { href, text: c.name }) : c.name)));
     const n = v => v === "" || v == null ? "–" : String(v);
     const ex = c.exchange || { companies: 0, swaps: 0 };
-    const people = c.reply_people || 0;
-    const recv = () => overlay(`Emails received · ${n(c.replies)} companies`, c.ov_received || [], `${people} people from ${n(c.replies)} companies`);
-    // [label, number, unit word, onClick, highlight]: numbers share one column, unit words follow in small grey text.
-    const rows = [
-      ["Emails scheduled", n(c.scheduled)],
-      ["Emails sent", n(c.sent_total ?? c.sent), "", () => sentBox(c)],
-      ["Emails received", n(c.replies), "companies", recv],
-      ["", String(people), "people", recv],
-      ["Open threads", n(c.open), "", () => overlay(`Open threads · ${n(c.open)}`, c.ov_open || [])],
-      ["Needs our reply", n(c.needs_reply), "", () => overlay(`Needs our reply · ${n(c.needs_reply)}`, c.ov_reply || []), Number(c.needs_reply) > 0],
-      ["Needs client reply", n(c.partner_reply)],
-      ["Exchange", String(ex.companies), "companies"],
-      ["", String(ex.swaps), "exchanges"],
-    ];
-    const dl = el("dl", { class: "rowsA" });
-    for (const [label, v, unit, open, hot] of rows) {
-      const num = el("dd", { class: "num" + (hot ? " hot" : "") + (label ? "" : " sub") });
-      const u = el("dd", { class: "unit" + (label ? "" : " sub") }, unit || "", open && label ? el("span", { class: "chev", "aria-hidden": "true", text: " ›" }) : null);
-      if (open) { const b = el("button", { type: "button", class: "dd-btn", "aria-haspopup": "dialog", "aria-label": `${label || "people"}: ${v}, show list` }, v); b.onclick = open; num.append(b); u.style.cursor = "pointer"; u.onclick = open; }
-      else num.textContent = v;
-      dl.append(el("dt", { class: label ? null : "sub", text: label }), num, u);
-    }
-    card.append(dl);
+    const recv = () => overlay(`Emails received · ${n(c.replies)} companies`, c.ov_received || [], `${c.reply_people || 0} people from ${n(c.replies)} companies`);
+    const openOv = () => overlay(`Open threads · ${(c.ov_open || []).length} companies`, c.ov_open || []);
+    const replyOv = () => overlay(`Needs our reply · ${(c.list_reply || []).length} companies`, c.ov_reply || []);
+    const toggle = el("div", { class: "cp", role: "group", "aria-label": "Count companies or people" });
+    const body = el("div");
+    const draw = () => {
+      toggle.replaceChildren(...[["companies", "Companies"], ["people", "People"]].map(([k, lab]) => {
+        const b = el("button", { type: "button", "aria-pressed": String(CP === k), text: lab }); b.onclick = () => setCP(k); return b; }));
+      const co = CP === "companies";
+      // [label, number, unit word, onClick, highlight]
+      const rows = co ? [
+        ["Emails scheduled", n(c.queued_cos), "companies"],
+        ["Emails sent", n(c.cos_reached), "companies", () => sentBox(c)],
+        ["Emails received", n(c.replies), "companies", recv],
+        ["Open threads", String((c.ov_open || []).length), "companies", openOv],
+        ["Needs our reply", String((c.list_reply || []).length), "companies", replyOv, (c.list_reply || []).length > 0],
+        ["Needs client reply", String((c.list_waiting || []).length), "companies"],
+        ["Exchange", String(ex.companies), "companies"],
+      ] : [
+        ["Emails scheduled", n(c.scheduled), "people"],
+        ["Emails sent", n(c.sent_total ?? c.sent), "people", () => sentBox(c)],
+        ["Emails received", String(c.reply_people || 0), "people", recv],
+        ["Open threads", String(peopleIn(c.ov_open)), "people", openOv],
+        ["Needs our reply", String(peopleIn(c.ov_reply)), "people", replyOv, peopleIn(c.ov_reply) > 0],
+        ["Needs client reply", String(namesIn(c.list_waiting)), "people"],
+        ["Exchange", String(ex.swaps), "exchanges"],
+      ];
+      const dl = el("dl", { class: "rowsA" });
+      for (const [label, v, unit, open, hot] of rows) {
+        const num = el("dd", { class: "num" + (hot ? " hot" : "") });
+        const u = el("dd", { class: "unit" }, unit || "", open ? el("span", { class: "chev", "aria-hidden": "true", text: " ›" }) : null);
+        if (open) { const b = el("button", { type: "button", class: "dd-btn", "aria-haspopup": "dialog", "aria-label": `${label}: ${v} ${unit}, show list` }, v); b.onclick = open; num.append(b); u.style.cursor = "pointer"; u.onclick = open; }
+        else num.textContent = v;
+        dl.append(el("dt", { text: label }), num, u);
+      }
+      body.replaceChildren(dl);
+    };
+    card.append(el("div", { class: "card-head" }, el("h3", {}, href ? el("a", { href, text: c.name }) : c.name), toggle), body);
     card.append(el("div", { class: "alerts card-foot" }, ...(c.alerts || []).map(a => el("span", { class: "pill warn", text: a }))));
+    cardDraws.push(draw); draw();
     return card;
+  }
+
+  // Source logos: the tool's own site icon.
+  const SRC_SITE = { "maxvisibility": "maximuslabs.ai", "max visibility": "maximuslabs.ai", "peec": "peec.ai", "peec ai": "peec.ai",
+    "athena hq": "athenahq.ai", "athenahq": "athenahq.ai", "triple whale backlinks": "triplewhale.com", "triple whale": "triplewhale.com",
+    "profound": "tryprofound.com", "ahrefs": "ahrefs.com", "semrush": "semrush.com" };
+  const srcLabel = name => {
+    const site = SRC_SITE[String(name || "").toLowerCase().trim()];
+    const logo = site ? el("img", { class: "logo", src: `https://www.google.com/s2/favicons?domain=${site}&sz=64`, alt: "", width: "16", height: "16", loading: "lazy" })
+      : el("span", { class: "logo none", "aria-hidden": "true", text: "✎" });
+    return el("span", {}, logo, name);
+  };
+
+  function homeQueue(d) {
+    const cs = d.clients.filter(c => !c.placeholder);
+    $("home-queue").replaceChildren(el("div", { class: "queue" },
+      el("div", { class: "queue-head" }, el("h3", { text: "Emails scheduled" }), el("span", { text: "Companies in each sequence not emailed yet · refill when below 20" })),
+      el("div", { class: "queue-grid" }, ...cs.map(c => {
+        const v = c.queued_cos, low = typeof v === "number" && v < 20;
+        return el("a", { class: "q" + (low ? " low" : ""), href: BASE + "/" + c.slug + "/" }, c.name,
+          el("b", { text: v == null ? "–" : String(v) }),
+          el("small", { text: `companies · ${c.queued_people == null ? "–" : c.queued_people} people waiting` + (low ? " · refill" : "") }));
+      }))));
   }
 
   function nav(d) {
@@ -660,6 +732,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     const all = {};
     for (const c of d.clients) for (const [day, [s, r, f = 0]] of Object.entries(c.days || {})) { const a = all[day] || (all[day] = [0, 0, 0]); a[0] += s; a[1] += r; a[2] += f; }
     calendar($("home-cal"), all, day => homeDay(d, day));
+    homeQueue(d);
     const tot = {};
     for (const c of d.clients) for (const [day, v] of Object.entries(trendOf(c))) { const a = tot[day] || (tot[day] = [0, 0, 0, 0]); v.forEach((x, i) => a[i] += x || 0); }
     perf($("home-perf"), tot);
@@ -699,8 +772,18 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
       current = key; const v = VIEWS.find(v => v.key === key); const rows = v.rows ? v.rows(c) : (c[key] || []);
       for (const b of $("seg").children) b.setAttribute("aria-selected", String(b.dataset.key === key));
       $("st-hint").textContent = v.hint;
+      $("copy-ex").hidden = key !== "completed" || !rows.length;
       $("st-head").replaceChildren(el("tr", {}, ...v.head.map(h => el("th", { text: h }))));
       $("st-body").replaceChildren(...(rows.length ? rows.map(x => el("tr", {}, ...(v.row ? v.row(x) : convRow(x, key)))) : [empty(v.head.length, v.empty)]));
+    };
+    $("copy-ex").onclick = async () => {
+      const cellv = v => String(v || "").replace(/[\t\n]+/g, " ");
+      const tsv = [["Partner", "Their page (lists us)", "Their date", "Our page (lists them)", "Our date", "Live since"].join("\t"),
+        ...(c.exchanges || []).map(x => [x.partner, x.their_url, x.their_date, x.our_url, x.our_date, x.live].map(cellv).join("\t"))].join("\n");
+      const b = $("copy-ex");
+      try { await navigator.clipboard.writeText(tsv); }
+      catch (e) { const t = el("textarea", {}); t.value = tsv; document.body.append(t); t.select(); document.execCommand("copy"); t.remove(); }
+      b.textContent = "Copied"; setTimeout(() => { b.textContent = "Copy table"; }, 1500);
     };
     $("seg").replaceChildren(...VIEWS.map(v => {
       const n = (v.rows ? v.rows(c) : (c[v.key] || [])).length;
@@ -709,18 +792,36 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     }));
     show(current);
     $("fills-when").textContent = d.updated ? `Last refreshed ${d.updated} IST` : "";
-    const fills = (c.fills || []).filter(f => typeof f.domains === "number"), srcs = c.sources || [];   // older reports had no per-source rows
+    const fills = (c.fills || []).filter(f => typeof f.domains === "number"), srcs = c.sources || [];
     $("src-sum").replaceChildren(...srcs.map(t => el("div", { class: "src-chip" }, el("b", { text: String(t.domains) }),
-      el("span", {}, t.source, el("small", { text: ` domains · last ${t.last}` })))));
-    $("fills").replaceChildren(...(fills.length ? fills.map(f => el("tr", {},
-      el("td", { class: "when num", text: f.date + (f.time ? ", " + f.time : "") }, f.time_est ? el("small", { class: "ph", text: "daily refill" }) : null),
-      el("td", { class: "co", text: f.source }),
-      el("td", { class: "num strong", text: String(f.domains) }))) :
-      [empty(3, (c.fills || []).length && !c.sources ? "The source breakdown appears after the next report." : "No domains added yet.")]));
+      el("span", {}, srcLabel(t.source), el("small", { text: ` domains · last ${t.last}` })))));
+    const names = srcs.map(t => t.source);
+    const by = {}; for (const f of fills) by[f.date + "|" + f.source] = f;
+    const led = c.ledger || [];
+    const dates = led.length ? led.map(r => r.date) : [...new Set(fills.map(f => f.date))].sort().reverse();
+    const lrow = Object.fromEntries(led.map(r => [r.date, r]));
+    $("fills-head").replaceChildren(
+      el("tr", {}, el("th", { rowspan: "2", text: "Date" }),
+        ...names.map(nm => el("th", { colspan: "2", class: "grp gs" }, srcLabel(nm))),
+        el("th", { colspan: "6", class: "grp gs", text: "Ledger · companies queued" })),
+      el("tr", {}, ...names.flatMap(() => [el("th", { class: "gs", text: "Date & time" }), el("th", { text: "Added" })]),
+        ...["Before", "+ Added", "− Emailed", "After", "Emails sent", "Note"].map((h, k) => el("th", { class: k ? "" : "gs", text: h }))));
+    const dash = v => v == null ? "–" : String(v);
+    $("fills").replaceChildren(...(dates.length ? dates.map(d => {
+      const r = lrow[d];
+      return el("tr", {}, el("td", { class: "when num", text: pretty(d) }),
+        ...names.flatMap(nm => { const f = by[d + "|" + nm];
+          return f ? [el("td", { class: "when num gs", text: f.date + (f.time ? ", " + f.time : "") }), el("td", { class: "num strong", text: String(f.domains) })]
+                   : [el("td", { class: "muted gs", text: "–" }), el("td", { class: "muted", text: "–" })]; }),
+        el("td", { class: "num gs", text: dash(r && r.before) }), el("td", { class: "num", text: r ? (r.added ? "+" + r.added : "0") : "–" }),
+        el("td", { class: "num", text: r ? (r.emailed ? "−" + r.emailed : "0") : "–" }), el("td", { class: "num strong" + (r && r.after < 0 ? " bad" : ""), text: dash(r && r.after) }),
+        el("td", { class: "num", text: dash(r && r.sent) }),
+        el("td", { class: r && /Under|Nothing/.test(r.note) ? "warn" : "muted", text: r ? (r.note || "OK") : "" }));
+    }) : [empty(2 + names.length * 2 + 5, (c.fills || []).length && !c.sources ? "The source breakdown appears after the next report." : "No domains added yet.")]));
     $("view-client").hidden = false;
-    requestAnimationFrame(() => {   // show the header and two rows; scroll for the rest
-      const w = $("fills-wrap"), rs = w.querySelectorAll("tbody tr");
-      if (rs.length > 2) w.style.maxHeight = (w.querySelector("thead").offsetHeight + rs[0].offsetHeight + rs[1].offsetHeight + 2) + "px";
+    requestAnimationFrame(() => {   // show the header and six rows; scroll for the rest
+      const w = $("fills-wrap"), rs = [...w.querySelectorAll("tbody tr")];
+      if (rs.length > 6) w.style.maxHeight = (w.querySelector("thead").offsetHeight + rs.slice(0, 6).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px";
     });
   }
 
