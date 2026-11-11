@@ -311,6 +311,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
 .perf-foot { font-size: 12px; color: var(--text3) }
 @media (max-width: 900px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
 @media (max-width: 480px) { .tile .tv { font-size: 21px } .perf { padding: 14px 12px } }
+.navbtn .count.zero { background: var(--raised); color: var(--text3); box-shadow: inset 0 0 0 1px var(--line) }
 </style>
 </head>
 <body>
@@ -365,7 +366,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
         <div class="sec-head"><h2 id="h-fills">Refill log</h2><span class="hint" id="fills-when"></span></div>
         <div class="table-wrap scroll2" id="fills-wrap">
           <table>
-            <thead><tr><th>Date &amp; time</th><th>Source</th><th>Emails scheduled</th><th>Waiting</th><th>Left</th></tr></thead>
+            <thead><tr><th>Date &amp; time</th><th>Source</th><th>Companies added</th><th>Emails scheduled</th><th>Waiting</th><th>Left</th></tr></thead>
             <tbody id="fills"></tbody>
           </table>
         </div>
@@ -472,7 +473,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
   function nav(d) {
     const box = $("nav");
     for (const c of d.clients) box.append(el("a", { href: BASE + "/" + c.slug + "/", class: "navbtn", "aria-current": MODE === "client" && c.slug === SLUG ? "page" : null },
-      el("span", { text: c.name }), c.needs_reply ? el("b", { class: "count", text: String(c.needs_reply) }) : null));
+      el("span", { text: c.name }), c.placeholder ? null : el("b", { class: "count" + (c.needs_reply ? "" : " zero"), title: "Needs our reply", text: String(c.needs_reply || 0) })));
     if (MODE === "team") $("nav-home").setAttribute("aria-current", "page");
   }
 
@@ -703,11 +704,13 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     show(current);
     $("fills-when").textContent = d.updated ? `Last refreshed ${d.updated} IST` : "";
     const fills = c.fills || [];
+    const dash = v => (v === "" || v == null) ? "–" : String(v);
     $("fills").replaceChildren(...(fills.length ? fills.map(f => el("tr", {},
-      el("td", { class: "when num", text: f.date + (f.time ? ", " + f.time : "") }, f.time ? null : el("small", { class: "ph", text: "time to be added" })),
-      el("td", {}, f.source ? f.source : el("span", { class: "ph", text: "Peec / MaxVisibility / Athena HQ: to be added" })),
-      el("td", { class: "num strong", text: f.added }), el("td", { class: "num", text: f.waiting }), el("td", { class: "num", text: f.left }))) :
-      [empty(5, "No refills logged yet.")]));
+      el("td", { class: "when num", text: f.date + (f.time ? ", " + f.time : "") }, f.time_est ? el("small", { class: "ph", text: "daily refill" }) : null),
+      el("td", {}, f.source ? f.source : el("span", { class: "ph", text: Number(f.added) ? "not in tracker" : "nothing added" })),
+      el("td", { class: "num", text: dash(f.companies) }),
+      el("td", { class: "num strong", text: dash(f.added !== "" ? f.added : f.people) }), el("td", { class: "num", text: dash(f.waiting) }), el("td", { class: "num", text: dash(f.left) }))) :
+      [empty(6, "No refills logged yet.")]));
     $("view-client").hidden = false;
     requestAnimationFrame(() => {   // show the header and two rows; scroll for the rest
       const w = $("fills-wrap"), rs = w.querySelectorAll("tbody tr");
