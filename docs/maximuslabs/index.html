@@ -545,6 +545,15 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
   const bucketLabel = (k, g) => g === "month" ? `${MON[Number(k.slice(5, 7)) - 1]} ${k.slice(0, 4)}` : g === "week" ? `Week of ${short(k)}` : pretty(k);
   const niceMax = v => { const s = v / 4; if (s <= 1) return 4; const p = Math.pow(10, Math.floor(Math.log10(s))); for (const m of [1, 2, 5, 10]) if (m * p >= s) return 4 * m * p; return 4 * s; };
 
+  // Until a report has written `trend`, build it from the calendar days and the completed exchanges.
+  const trendOf = c => {
+    if (c.trend) return c.trend;
+    const t = {};
+    for (const [d, [s, r, f = 0]] of Object.entries(c.days || {})) t[d] = [s + f, 0, r, 0];
+    for (const x of c.exchanges || []) { const d = (x.live || "").slice(0, 10); if (d) (t[d] || (t[d] = [0, 0, 0, 0]))[3] += 1; }
+    return t;
+  };
+
   function perf(box, trend) {
     const today = todayIST();
     const keys = Object.keys(trend || {}).sort();
@@ -645,7 +654,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     for (const c of d.clients) for (const [day, [s, r, f = 0]] of Object.entries(c.days || {})) { const a = all[day] || (all[day] = [0, 0, 0]); a[0] += s; a[1] += r; a[2] += f; }
     calendar($("home-cal"), all, day => homeDay(d, day));
     const tot = {};
-    for (const c of d.clients) for (const [day, v] of Object.entries(c.trend || {})) { const a = tot[day] || (tot[day] = [0, 0, 0, 0]); v.forEach((x, i) => a[i] += x || 0); }
+    for (const c of d.clients) for (const [day, v] of Object.entries(trendOf(c))) { const a = tot[day] || (tot[day] = [0, 0, 0, 0]); v.forEach((x, i) => a[i] += x || 0); }
     perf($("home-perf"), tot);
     $("view-home").hidden = false;
   }
@@ -677,7 +686,7 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     $("client-name").textContent = c.name;
     $("client-card").replaceChildren(card(c, null));
     calendar($("client-cal"), c.days || {}, () => {});
-    perf($("client-perf"), c.trend || {});
+    perf($("client-perf"), trendOf(c));
     let current = "completed";
     const show = key => {
       current = key; const v = VIEWS.find(v => v.key === key); const rows = v.rows ? v.rows(c) : (c[key] || []);
