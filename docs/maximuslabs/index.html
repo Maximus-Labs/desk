@@ -709,14 +709,14 @@ dialog.ov footer { padding: 10px 16px; border-top: 1px solid var(--line); font-s
     }));
     show(current);
     $("fills-when").textContent = d.updated ? `Last refreshed ${d.updated} IST` : "";
-    const fills = c.fills || [], srcs = c.sources || [];
+    const fills = (c.fills || []).filter(f => typeof f.domains === "number"), srcs = c.sources || [];   // older reports had no per-source rows
     $("src-sum").replaceChildren(...srcs.map(t => el("div", { class: "src-chip" }, el("b", { text: String(t.domains) }),
       el("span", {}, t.source, el("small", { text: ` domains · last ${t.last}` })))));
     $("fills").replaceChildren(...(fills.length ? fills.map(f => el("tr", {},
       el("td", { class: "when num", text: f.date + (f.time ? ", " + f.time : "") }, f.time_est ? el("small", { class: "ph", text: "daily refill" }) : null),
       el("td", { class: "co", text: f.source }),
       el("td", { class: "num strong", text: String(f.domains) }))) :
-      [empty(3, "No domains added yet.")]));
+      [empty(3, (c.fills || []).length && !c.sources ? "The source breakdown appears after the next report." : "No domains added yet.")]));
     $("view-client").hidden = false;
     requestAnimationFrame(() => {   // show the header and two rows; scroll for the rest
       const w = $("fills-wrap"), rs = w.querySelectorAll("tbody tr");
