@@ -342,6 +342,20 @@ table.led td.muted { color: var(--text3) }
 .copy-btn { font: inherit; font-size: 12.5px; padding: 6px 12px; border: 1px solid var(--line); background: var(--raised); color: var(--text); cursor: pointer; border-radius: var(--r-pill) }
 .copy-btn:hover { border-color: var(--text3) }
 .st-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap }
+.obar { display: flex; gap: 2px; border-radius: 2px; overflow: hidden; background: var(--raised) }
+.obar i { display: block; height: 100% }
+.card-out { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line) }
+.card-out .co-l { font-size: 12px; color: var(--text3) }
+.card-out .co-n { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text2) }
+.card-out .co-n i, .rf .chip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px }
+.out-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.out-cell { display: grid; gap: 3px; padding: 12px 14px; background: var(--raised); border: 1px solid var(--line); border-left: 3px solid var(--oc) }
+.out-cell span { font-size: 13px; color: var(--text2) } .out-cell b { font-family: var(--mono); font-size: 26px; font-weight: 500 }
+.out-cell small { font-size: 11.5px; color: var(--text3) }
+.rf { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; color: var(--text3) }
+.rf .chip { font: inherit; font-size: 12.5px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--raised); color: var(--text2); cursor: pointer }
+.rf .chip[aria-pressed="true"] { color: var(--text); border-color: var(--text3) }
+@media (max-width: 640px) { .out-grid { grid-template-columns: 1fr } }
 </style>
 </head>
 <body>
@@ -368,6 +382,7 @@ table.led td.muted { color: var(--text3) }
         <div class="home-top"><div class="daybox" id="home-day"></div><div id="home-cal"></div></div>
       </section>
       <section aria-label="Emails scheduled"><div id="home-queue"></div></section>
+      <section aria-label="Reply outcomes"><div id="home-out"></div></section>
       <section aria-label="Performance"><div id="home-perf"></div></section>
       <section aria-label="Clients"><div class="cards" id="cards"></div></section>
     </div>
@@ -517,7 +532,9 @@ table.led td.muted { color: var(--text3) }
         else num.textContent = v;
         dl.append(el("dt", { text: label }), num, u);
       }
-      body.replaceChildren(dl);
+      const o = c.outcomes;
+      body.replaceChildren(dl, o ? el("div", { class: "card-out" }, el("span", { class: "co-l", text: "Replies" }), outBar(o, 8),
+        el("div", { class: "co-n" }, ...OUT.map(([k, l, col]) => el("span", {}, el("i", { style: `background:${col}` }), `${l} ${o[k] || 0}`)))) : null);
     };
     card.append(el("div", { class: "card-head" }, el("h3", {}, href ? el("a", { href, text: c.name }) : c.name), toggle), body);
     card.append(el("div", { class: "alerts card-foot" }, ...(c.alerts || []).map(a => el("span", { class: "pill warn", text: a }))));
@@ -535,6 +552,22 @@ table.led td.muted { color: var(--text3) }
       : el("span", { class: "logo none", "aria-hidden": "true", text: "✎" });
     return el("span", {}, logo, name);
   };
+
+  function homeOutcomes(d) {
+    const cs = d.clients.filter(c => c.outcomes);
+    if (!cs.length) { $("home-out").replaceChildren(); return; }
+    const sum = {}; const why = {};
+    for (const c of cs) { for (const [k, v] of Object.entries(c.outcomes)) if (typeof v === "number") sum[k] = (sum[k] || 0) + v;
+      for (const [r, n] of Object.entries(c.outcomes.reasons || {})) why[r] = (why[r] || 0) + n; }
+    const total = OUT.reduce((a, [k]) => a + (sum[k] || 0), 0);
+    const reasonsOf = g => Object.entries(why).filter(([r]) => r.startsWith(g + ":")).sort((a, b) => b[1] - a[1]).map(([r, n]) => `${r.split(":")[1]} ${n}`).join(" · ");
+    $("home-out").replaceChildren(el("div", { class: "queue" },
+      el("div", { class: "queue-head" }, el("h3", { text: `Replies · ${total} companies` }), el("span", { text: "What each reply means for an exchange · all clients" })),
+      outBar(sum, 12),
+      el("div", { class: "out-grid" }, ...OUT.map(([k, l, col]) => el("div", { class: "out-cell", style: `--oc:${col}` },
+        el("span", { text: l }), el("b", { text: String(sum[k] || 0) }),
+        el("small", { text: k === "accepted" ? `${sum.live || 0} live · ${(sum.accepted || 0) - (sum.live || 0)} agreed, not live yet` : reasonsOf(k) }))))));
+  }
 
   function homeQueue(d) {
     const cs = d.clients.filter(c => !c.placeholder);
@@ -633,10 +666,16 @@ table.led td.muted { color: var(--text3) }
     return t;
   };
 
+  // Reply outcomes: what each company's reply means for an exchange.
+  const OUT = [["accepted", "Accepted", "#1fa067"], ["progress", "In progress", "#c8841f"], ["dropped", "Not going ahead", "#8a8a94"]];
+  const outBar = (o, h = 10) => { const t = OUT.reduce((a, [k]) => a + ((o || {})[k] || 0), 0) || 1;
+    return el("div", { class: "obar", style: `height:${h}px`, role: "img", "aria-label": OUT.map(([k, l]) => `${l} ${(o || {})[k] || 0}`).join(", ") },
+      ...OUT.map(([k, , c]) => (o || {})[k] ? el("i", { style: `width:${o[k] / t * 100}%;background:${c}` }) : null)); };
+
   function perf(box, trend) {
     const today = todayIST();
     const keys = Object.keys(trend || {}).sort();
-    let range = "28d", group = "day", on = [true, false, false, false];
+    let range = "28d", group = "day", on = [true, false, false, false], rf = "all";   // rf: which replies the Replies line counts
     const segOf = (opts, cur, set) => el("div", { class: "seg", role: "tablist" }, ...opts.map(([k, lab]) => {
       const b = el("button", { type: "button", role: "tab", "aria-selected": String(k === cur), text: lab });
       b.onclick = () => { set(k); draw(); }; return b;
@@ -650,12 +689,13 @@ table.led td.muted { color: var(--text3) }
       for (const d of keys) {
         if (d < start || d > today) continue;
         const v = trend[d] || [], b = buckets.get(bucketOf(d, group));
-        for (let i = 0; i < 4; i++) { b[i] += v[i] || 0; totals[i] += v[i] || 0; }
+        const val = i => i === 2 && rf !== "all" ? (v[{ accepted: 4, progress: 5, dropped: 6 }[rf]] || 0) : (v[i] || 0);
+        for (let i = 0; i < 4; i++) { b[i] += val(i); totals[i] += val(i); }
       }
       const pts = [...buckets.entries()];
       const tiles = el("div", { class: "tiles" }, ...METRICS.map((m, i) => {
         const t = el("button", { type: "button", class: "tile", "aria-pressed": String(on[i]), style: `--tc:${m.color}` },
-          el("span", { class: "tl" }, el("span", { class: "box", text: on[i] ? "✓" : "" }), m.label),
+          el("span", { class: "tl" }, el("span", { class: "box", text: on[i] ? "✓" : "" }), i === 2 && rf !== "all" ? `Replies · ${OUT.find(o => o[0] === rf)[1]}` : m.label),
           el("span", { class: "tv", text: totals[i].toLocaleString("en-IN") }));
         t.onclick = () => { on[i] = !on[i]; if (!on.some(Boolean)) on[i] = true; draw(); }; return t;
       }));
@@ -663,7 +703,11 @@ table.led td.muted { color: var(--text3) }
       const card = el("div", { class: "perf" },
         el("div", { class: "perf-head" }, el("h3", { text: "Performance" }),
           el("div", { class: "perf-ctl" }, segOf(RANGES.map(r => [r[0], r[1]]), range, k => range = k), segOf(GROUPS, group, k => group = k))),
-        tiles, plot,
+        tiles,
+        on[2] && keys.some(k => (trend[k] || []).length > 4) ? el("div", { class: "rf", role: "group", "aria-label": "Which replies to count" }, el("span", { text: "Replies:" }),
+          ...[["all", "All", ""], ...OUT].map(([k, l, c]) => { const b = el("button", { type: "button", class: "chip", "aria-pressed": String(rf === k) },
+            c ? el("i", { style: `background:${c}` }) : null, l); b.onclick = () => { rf = k; draw(); }; return b; })) : null,
+        plot,
         el("div", { class: "perf-foot", text: "Companies and replies count each company once, on the first day it was emailed or replied. With more than one metric on, each line has its own scale." }));
       box.replaceChildren(card);
       chart(plot, pts);
@@ -733,6 +777,7 @@ table.led td.muted { color: var(--text3) }
     for (const c of d.clients) for (const [day, [s, r, f = 0]] of Object.entries(c.days || {})) { const a = all[day] || (all[day] = [0, 0, 0]); a[0] += s; a[1] += r; a[2] += f; }
     calendar($("home-cal"), all, day => homeDay(d, day));
     homeQueue(d);
+    homeOutcomes(d);
     const tot = {};
     for (const c of d.clients) for (const [day, v] of Object.entries(trendOf(c))) { const a = tot[day] || (tot[day] = [0, 0, 0, 0]); v.forEach((x, i) => a[i] += x || 0); }
     perf($("home-perf"), tot);
@@ -746,7 +791,7 @@ table.led td.muted { color: var(--text3) }
       rows: c => c.exchanges || [], row: x => [el("td", { class: "partner", text: x.partner }),
         el("td", { class: "url" }, link(x.their_url), x.their_date ? el("small", { text: x.their_date }) : null),
         el("td", { class: "url" }, link(x.our_url), x.our_date ? el("small", { text: x.our_date }) : null),
-        el("td", { class: "when num", text: x.live || "–" })] },
+        el("td", { class: "when num", text: x.live || "Earlier" })] },
     { key: "list_reply", label: "Needs our reply", hint: "They replied and the next message is ours (Late after 3 days without our answer), or we wrote and have had no reply for 5 days.",
       head: ["Company", "Contact", "Status", "Last message"], empty: "Nobody is waiting on us." },
     { key: "list_waiting", label: "Needs client reply", hint: "We sent the last email and are waiting for them. After 5 days with no answer it moves to Needs our reply.",
@@ -757,7 +802,8 @@ table.led td.muted { color: var(--text3) }
       head: ["Company", "Contact", "Status", "Last message"], empty: "Nothing here." },
   ];
   const convRow = (x, key) => [el("td", { class: "co", text: x.company }), el("td", { text: x.contact || "–" }),
-    el("td", {}, stagePill(x.stage), x.tag ? el("span", { class: "pill warn", style: "margin-left:6px", text: x.tag }) : null),
+    el("td", {}, stagePill(x.stage), x.reason && key !== "list_paid" ? el("span", { class: "pill", style: "margin-left:6px", text: x.reason }) : null,
+      x.tag ? el("span", { class: "pill warn", style: "margin-left:6px", text: x.tag }) : null),
     el("td", { class: "when num", text: day(x.last_at) })];
 
   function renderClient(d) {
