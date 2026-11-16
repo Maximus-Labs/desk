@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer">
+<title>Oliv AI outreach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Client view: three numbers, one chart, two short tables. Dark, like the team desk. */
+  --bg:#0b0b0c; --surface:#141415; --raised:#1b1b1d; --line:#2a2a2d; --text:#ececee; --text2:#b4b4ba; --text3:#7d7d85;
+  --acc:#3d8ff0; --yes:#1fa067; --wip:#c8841f;
+  --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace; color-scheme:dark;
+}
+*{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 var(--body)}
+main{max-width:980px;margin:0 auto;padding:32px 20px 60px;display:grid;gap:20px}
+h1{font-size:24px;line-height:1.25;margin:0;text-wrap:balance} h2{font-size:15px;margin:0}
+a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline} a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-end}
+.head small{color:var(--text3);font-size:12.5px}
+.badge{font:12px var(--mono);color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:4px;align-content:start}
+.kpi span{font-size:13px;color:var(--text2)} .kpi b{font:500 38px/1.05 var(--mono);font-variant-numeric:tabular-nums} .kpi small{font-size:12px;color:var(--text3)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px} .ph span{font-size:12.5px;color:var(--text3)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--text2)} .legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:3px}
+svg text{font-family:var(--mono);font-size:10.5px;fill:var(--text3)}
+.wrap{overflow-x:auto}
+.scroll{overflow-y:auto;overflow-x:hidden}
+.scroll table{table-layout:fixed} .scroll td{overflow-wrap:anywhere} .scroll td a{word-break:break-word}
+@media (max-width:640px){
+  .scroll table, .scroll tbody, .scroll tr, .scroll td{display:block;width:auto}
+  .scroll thead{display:none}
+  .scroll tr{padding:10px 2px;border-bottom:1px solid var(--line)} .scroll tr:last-child{border-bottom:0}
+  .scroll td{border:0;padding:2px 0} .scroll td:first-child{font-weight:600}
+  .scroll td[data-l]::before{content:attr(data-l);display:block;font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:6px}
+}
+.scroll th:nth-child(1){width:20%} .scroll th:nth-child(2),.scroll th:nth-child(3){width:31%} .scroll th:nth-child(4){width:18%} .scroll thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+table{width:100%;border-collapse:collapse;font-size:13.5px} th{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top} tr:last-child td{border-bottom:0}
+td.d{font-family:var(--mono);white-space:nowrap;color:var(--text2)}
+.pill{font-size:11.5px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.pill.yes{color:var(--yes);border-color:color-mix(in srgb,var(--yes) 45%,transparent)} .pill.wip{color:var(--wip);border-color:color-mix(in srgb,var(--wip) 45%,transparent)}
+.empty{color:var(--text3);font-size:13.5px}
+.foot{font-size:12px;color:var(--text3)}
+@media (max-width:620px){.kpis{grid-template-columns:1fr}}
+</style></head><body><main id="app">
+<div class="head"><div style="display:grid;gap:4px"><h1 id="title">Outreach</h1><small id="sub">Loading…</small></div><span class="badge" id="upd">Updating…</span></div>
+<div class="kpis">
+  <div class="kpi"><span>Emails sent</span><b id="k1">–</b><small id="k1s"></small></div>
+  <div class="kpi"><span>Replies</span><b id="k2">–</b><small id="k2s">companies wrote back</small></div>
+  <div class="kpi"><span>Exchanges</span><b id="k3">–</b><small id="k3s"></small></div>
+</div>
+<section class="panel" aria-labelledby="h-act"><div class="ph"><h2 id="h-act">Daily activity</h2><div class="legend"><span><i style="background:var(--acc)"></i>Emails sent</span><span><i style="background:var(--yes)"></i>Replies</span></div></div><div id="chart"></div></section>
+<section class="panel" aria-labelledby="h-ex"><div class="ph"><h2 id="h-ex">Live exchanges</h2><span id="ex-note">Both pages published</span></div><div class="scroll" id="ex-wrap"><table><thead><tr><th>Partner</th><th>Their page (lists you)</th><th>Your page (lists them)</th><th>Live since</th></tr></thead><tbody id="ex"></tbody></table></div></section>
+<section class="panel" aria-labelledby="h-cv"><div class="ph"><h2 id="h-cv">Conversations</h2><span>Companies discussing an exchange</span></div><div class="wrap"><table><thead><tr><th>Company</th><th>Status</th><th>Last update</th></tr></thead><tbody id="cv"></tbody></table></div></section>
+<p class="foot">Prepared by MaximusLabs. Updated twice a day, at about 9:10 and 15:10 IST.</p>
+</main>
+<script>
+const DATA = "";
+const INLINE = {"updated": "2026-11-16 15:11", "name": "Oliv AI", "started": "2026-11-10", "emails": 50, "first_emails": 50, "companies_reached": 42, "replies": 6, "exchanges": [{"partner": "getmaxiq.com", "their_url": "https://www.getmaxiq.com/blog/best-ai-sales-forecasting-tools", "our_url": "https://www.oliv.ai/blog/gong-alternatives", "live": "", "month": "Sep 2026"}, {"partner": "goairspeed.com", "their_url": "https://www.goairspeed.com/academy/alternatives/best-revenue-intelligence-platforms", "our_url": "https://www.oliv.ai/blog/best-deal-intelligence-platform", "live": "", "month": "Oct 2026"}, {"partner": "coworker.ai", "their_url": "https://coworker.ai/blog/gong-alternatives", "our_url": "https://www.oliv.ai/blog/ai-agents-for-sales-teams", "live": "", "month": "Oct 2026"}, {"partner": "cleverly.co", "their_url": "https://www.cleverly.co/blog/revenue-intelligence-tools", "our_url": "https://oliv.ai/blog/outbound-marketing-agencies", "live": "", "month": "Oct 2026"}], "agreed": 2, "days": {"2026-11-10": [10, 1], "2026-11-11": [10, 3], "2026-11-12": [10, 1], "2026-11-13": [10, 0], "2026-11-15": [0, 1], "2026-11-16": [10, 0]}, "conversations": [{"company": "cuoral.com", "status": "Agreed", "last_at": "2026-11-16"}, {"company": "coldreach.ai", "status": "Agreed", "last_at": "2026-11-12"}, {"company": "ampup.ai", "status": "In talks", "last_at": "2026-11-16"}, {"company": "velaris.io", "status": "In talks", "last_at": "2026-11-12"}, {"company": "revspire.io", "status": "In talks", "last_at": "2026-11-11"}, {"company": "salesforge.ai", "status": "In talks", "last_at": "2026-11-10"}]};   // a snapshot build puts the data here instead of reading the published tab
+const $ = id => document.getElementById(id);
+const el = (t, a = {}, ...k) => { const n = document.createElement(t); for (const [x, v] of Object.entries(a)) x === "text" ? n.textContent = v : n.setAttribute(x, v); n.append(...k.filter(v => v != null)); return n; };
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const pretty = d => d ? `${+d.slice(8, 10)} ${MON[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : "";
+const short = d => `${+d.slice(8, 10)} ${MON[+d.slice(5, 7) - 1]}`;
+const firstCell = t => { if (t[0] !== '"') return t.split(/[,\n]/)[0]; let o = "", i = 1; for (; i < t.length; i++) { if (t[i] === '"') { if (t[i + 1] === '"') { o += '"'; i++; } else break; } else o += t[i]; } return o; };
+const link = u => u ? el("a", { href: u, rel: "noopener" , target: "_blank", text: u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "") }) : el("span", { class: "empty", text: "–" });
+const addDays = (d, k) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + k); return t.toISOString().slice(0, 10); };
+
+function chart(days, start) {
+  const keys = Object.keys(days).sort(); if (!keys.length) { $("chart").replaceChildren(el("p", { class: "empty", text: "No emails yet." })); return; }
+  const end = keys[keys.length - 1] > new Date().toISOString().slice(0, 10) ? keys[keys.length - 1] : new Date().toISOString().slice(0, 10);
+  let from = start || keys[0]; if (addDays(from, 41) < end) from = addDays(end, -41);
+  const ds = []; for (let d = from; d <= end; d = addDays(d, 1)) ds.push(d);
+  const W = 900, H = 200, L = 28, T = 10, B = 24, iw = W - L - 12, ih = H - T - B, ns = "http://www.w3.org/2000/svg";
+  const vmax = Math.max(4, ...ds.map(d => (days[d] || [0, 0])[0])); const max = Math.ceil(vmax / 4) * 4;
+  const s = (t, a) => { const n = document.createElementNS(ns, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
+  const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": `Emails sent and replies per day from ${pretty(from)} to ${pretty(end)}` });
+  for (let g = 0; g <= 4; g++) { const y = T + ih - g * ih / 4; svg.append(s("line", { x1: L, x2: W - 12, y1: y, y2: y, stroke: g ? "#222225" : "#333336" })); const t = s("text", { x: L - 6, y: y + 3.5, "text-anchor": "end" }); t.textContent = max * g / 4; svg.append(t); }
+  const n = ds.length, x = i => L + (n === 1 ? iw / 2 : i * iw / (n - 1)), y = v => T + ih - v / max * ih;
+  [[0, "#3d8ff0"], [1, "#1fa067"]].forEach(([k, c]) => {
+    svg.append(s("path", { d: ds.map((d, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y((days[d] || [0, 0])[k]).toFixed(1)}`).join(" "), fill: "none", stroke: c, "stroke-width": 2, "stroke-linejoin": "round" }));
+    if (n <= 21) ds.forEach((d, i) => { const v = (days[d] || [0, 0])[k]; const ci = s("circle", { cx: x(i), cy: y(v), r: 3, fill: c, stroke: "#141415", "stroke-width": 2 }); const tt = s("title", {}); tt.textContent = `${short(d)}: ${v} ${k ? "replies" : "emails sent"}`; ci.append(tt); svg.append(ci); });
+  });
+  const step = Math.max(1, Math.ceil(n / 8));
+  ds.forEach((d, i) => { if (i % step && i !== n - 1) return; if (i !== n - 1 && n - 1 - i < step * 0.7) return; const t = s("text", { x: x(i), y: H - 6, "text-anchor": n === 1 ? "middle" : i === 0 ? "start" : i === n - 1 ? "end" : "middle" }); t.textContent = short(d); svg.append(t); });
+  $("chart").replaceChildren(svg);
+}
+
+function render(c) {
+  document.title = `${c.name} outreach`;
+  $("title").textContent = `${c.name} · Link-exchange outreach`;
+  $("sub").textContent = "Prepared by MaximusLabs" + (c.started ? ` · outreach started ${pretty(c.started)}` : "");
+  $("upd").textContent = `Updated ${c.updated} IST`;
+  $("k1").textContent = c.emails; $("k1s").textContent = `${c.companies_reached} companies reached`;
+  $("k2").textContent = c.replies;
+  $("k3").textContent = c.exchanges.length; $("k3s").textContent = `live · ${c.agreed} agreed and on the way`;
+  chart(c.days || {}, c.started);
+  $("ex").replaceChildren(...(c.exchanges.length ? c.exchanges.map(x => el("tr", {}, el("td", { text: x.partner }), el("td", { "data-l": "Their page (lists you)" }, link(x.their_url)), el("td", { "data-l": "Your page (lists them)" }, link(x.our_url)), el("td", { class: "d", "data-l": "Live since", text: x.live ? pretty(x.live) : (x.month || "") })))
+    : [el("tr", {}, el("td", { colspan: "4", class: "empty", text: "None yet. Exchanges appear here once both pages are published." }))]));
+  requestAnimationFrame(() => {   // show five exchanges; scroll for the rest
+    const w = $("ex-wrap"), rs = [...w.querySelectorAll("tbody tr")];
+    if (rs.length > 5) { w.style.maxHeight = (w.querySelector("thead").offsetHeight + rs.slice(0, 5).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px"; $("ex-note").textContent = `${rs.length} live · scroll for more`; }
+  });
+  $("cv").replaceChildren(...(c.conversations.length ? c.conversations.map(x => el("tr", {}, el("td", { text: x.company }), el("td", {}, el("span", { class: "pill " + (x.status === "Agreed" ? "yes" : "wip"), text: x.status })), el("td", { class: "d", text: x.last_at ? short(x.last_at) : "" })))
+    : [el("tr", {}, el("td", { colspan: "3", class: "empty", text: "No conversations open right now." }))]));
+}
+
+if (INLINE) render(INLINE); else fetch(DATA, { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+  .then(t => render(JSON.parse(firstCell(t.trim()))))
+  .catch(() => { $("sub").textContent = "The figures could not be loaded. Refresh the page in a minute."; $("upd").textContent = "Not loaded"; });
+</script></body></html>
