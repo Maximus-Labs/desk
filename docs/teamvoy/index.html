@@ -664,7 +664,7 @@ table.led td.muted { color: var(--text3) }
   // trend: {"YYYY-MM-DD": [emails sent, new companies, companies replied, exchanges live]}
   const METRICS = [
     { label: "Emails sent", color: "#3d8ff0" },
-    { label: "New companies reached", color: "#c8841f" },
+    { label: "New companies reached", color: "#9b7bf0" },
     { label: "Replies (companies)", color: "#1fa067" },
     { label: "New exchanges", color: "#d95aa0" },
   ];
@@ -699,7 +699,7 @@ table.led td.muted { color: var(--text3) }
 
   // What happened with each reply, one colour per kind (cards and Home share these).
   const CATS = [["live", "Live", "#1fa067"], ["agreed", "Agreed, not live yet", "#93dcb4"], ["talks", "In talks", "#e8962e"],
-    ["paid", "Paid placement", "#e0607e"], ["bar", "Below their DR/DA bar", "#5b9cf0"], ["declined", "Declined / not a fit", "#ececee"],
+    ["paid", "Paid placement", "#e6c53f"], ["bar", "Below their DR/DA bar", "#2bb3c0"], ["declined", "Declined / not a fit", "#ececee"],
     ["away", "Out of office", "#050506"]];
   const catOf = r => { const [g, w] = r.split(":");
     return g === "progress" ? "talks" : g === "none" ? "away" : w === "Paid only" ? "paid" : w === "Below their DR/DA bar" ? "bar" : "declined"; };
