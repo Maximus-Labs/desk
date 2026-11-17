@@ -344,6 +344,21 @@ table.led td.muted { color: var(--text3) }
 .st-tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap }
 .obar { display: flex; gap: 2px; border-radius: 2px; overflow: hidden; background: var(--raised) }
 .obar i { display: block; height: 100% }
+.obar i.away, .card-out .co-n i.away, .nl-l i.away { box-shadow: inset 0 0 0 1px #6b6b74 }
+.nl { display: grid; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line) }
+.nl-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px }
+.nl-head h4 { margin: 0; font-size: 14px; font-weight: 600 } .nl-head span { font-size: 12.5px; color: var(--text3) }
+.nl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.nl-cell { display: grid; align-content: start; gap: 4px; padding: 12px 14px; background: var(--raised); border: 1px solid var(--line); border-top: 3px solid var(--oc) }
+.nl-cell.zero { opacity: .55 }
+.nl-l { font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 7px }
+.nl-l i { width: 9px; height: 9px; border-radius: 2px; background: var(--oc); flex: none }
+.nl-cell b { font-family: var(--mono); font-size: 26px; font-weight: 500 } .nl-cell b small { font-size: 12px; color: var(--text3); font-weight: 400 }
+.nl-cell ul { list-style: none; margin: 2px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12.5px; color: var(--text2) }
+.nl-cell li { display: flex; justify-content: space-between; gap: 8px } .nl-cell li em { font-style: normal; font-family: var(--mono); color: var(--text) }
+.nl-h { font-size: 11.5px; color: var(--text3) }
+@media (max-width: 760px) { .nl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (max-width: 480px) { .nl-grid { grid-template-columns: 1fr } }
 .card-out { display: grid; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line) }
 .card-out .co-l { font-size: 12px; color: var(--text3) }
 .card-out .co-n { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text2) }
@@ -533,8 +548,9 @@ table.led td.muted { color: var(--text3) }
         dl.append(el("dt", { text: label }), num, u);
       }
       const o = c.outcomes;
-      body.replaceChildren(dl, o ? el("div", { class: "card-out" }, el("span", { class: "co-l", text: "Replies" }), outBar(o, 8),
-        el("div", { class: "co-n" }, ...OUT.map(([k, l, col]) => el("span", {}, el("i", { style: `background:${col}` }), `${l} ${o[k] || 0}`)))) : null);
+      const bk = breakdown(o, c), tot = ALL.reduce((a, k) => a + bk.n[k], 0);
+      body.replaceChildren(dl, o ? el("div", { class: "card-out" }, el("span", { class: "co-l", text: `Replies · ${tot} companies` }), catBar(bk.n, ALL, 8),
+        el("div", { class: "co-n" }, ...CATS.filter(([k]) => bk.n[k]).map(([k, l, col]) => el("span", {}, el("i", { class: k === "away" ? "away" : null, style: `background:${col}` }), `${l} ${bk.n[k]}`)))) : null);
     };
     card.append(el("div", { class: "card-head" }, el("h3", {}, href ? el("a", { href, text: c.name }) : c.name), toggle), body);
     card.append(el("div", { class: "alerts card-foot" }, ...(c.alerts || []).map(a => el("span", { class: "pill warn", text: a }))));
@@ -566,7 +582,31 @@ table.led td.muted { color: var(--text3) }
       outBar(sum, 12),
       el("div", { class: "out-grid" }, ...OUT.map(([k, l, col]) => el("div", { class: "out-cell", style: `--oc:${col}` },
         el("span", { text: l }), el("b", { text: String(sum[k] || 0) }),
-        el("small", { text: k === "accepted" ? `${sum.live || 0} live · ${(sum.accepted || 0) - (sum.live || 0)} agreed, not live yet` : reasonsOf(k) }))))));
+        el("small", { text: k === "accepted" ? `${sum.live || 0} live · ${(sum.accepted || 0) - (sum.live || 0)} agreed, not live yet` : reasonsOf(k) })))),
+      notLive(cs)));
+  }
+
+  // The replies that are not live yet, by what happened: agreed, in talks, paid, DR/DA bar, declined, out of office.
+  function notLive(cs) {
+    const n = {}, why = {};
+    for (const c of cs) { const b = breakdown(c.outcomes, c);
+      for (const [k] of CATS) { n[k] = (n[k] || 0) + b.n[k]; why[k] = why[k] || {}; for (const [w, v] of Object.entries(b.why[k])) why[k][w] = (why[k][w] || 0) + v; } }
+    const keys = ALL.filter(k => k !== "live"), total = keys.reduce((a, k) => a + n[k], 0), away = n.away || 0;
+    const sub = Object.fromEntries(keys.map(k => [k, Object.entries(why[k] || {}).sort((a, b) => b[1] - a[1])]));
+    const hint = { agreed: "They said yes · blog, doc or link still to come", talks: "Still deciding", paid: "Asked for payment to list you",
+      bar: "Our site is under their DR/DA bar", declined: "Not doing exchanges now, or not relevant", away: "Auto-reply only · not counted above" };
+    return el("div", { class: "nl" },
+      el("div", { class: "nl-head" }, el("h4", { text: `Not live yet · ${total - away} replies` + (away ? ` + ${away} out of office` : "") }),
+        el("span", { text: "What happened with each company that replied but has no live exchange" })),
+      catBar(n, keys, 14),
+      el("div", { class: "nl-grid" }, ...CATS.filter(([k]) => keys.includes(k)).map(([k, l, col]) => {
+        const pct = total ? Math.round(n[k] / total * 100) : 0;
+        const rs = k === "agreed" || k === "paid" || k === "bar" ? [] : sub[k].filter(([w]) => !(k === "away" && w === "Out of office" && sub[k].length === 1));
+        return el("div", { class: "nl-cell" + (n[k] ? "" : " zero"), style: `--oc:${col}` },
+          el("span", { class: "nl-l" }, el("i", { class: k === "away" ? "away" : null }), l),
+          el("b", {}, String(n[k]), el("small", { text: n[k] ? ` ${pct}%` : "" })),
+          rs.length ? el("ul", {}, ...rs.map(([w, v]) => el("li", {}, el("span", { text: w }), el("em", { text: String(v) })))) : el("small", { class: "nl-h", text: hint[k] }));
+      })));
   }
 
   function homeQueue(d) {
@@ -671,6 +711,34 @@ table.led td.muted { color: var(--text3) }
   const outBar = (o, h = 10) => { const t = OUT.reduce((a, [k]) => a + ((o || {})[k] || 0), 0) || 1;
     return el("div", { class: "obar", style: `height:${h}px`, role: "img", "aria-label": OUT.map(([k, l]) => `${l} ${(o || {})[k] || 0}`).join(", ") },
       ...OUT.map(([k, , c]) => (o || {})[k] ? el("i", { style: `width:${o[k] / t * 100}%;background:${c}` }) : null)); };
+
+  // What happened with each reply, one colour per kind (cards and Home share these).
+  const CATS = [["live", "Live", "#1fa067"], ["agreed", "Agreed, not live yet", "#93dcb4"], ["talks", "In talks", "#e8962e"],
+    ["paid", "Paid placement", "#e0607e"], ["bar", "Below their DR/DA bar", "#5b9cf0"], ["declined", "Declined / not a fit", "#ececee"],
+    ["away", "Out of office", "#050506"]];
+  const catOf = r => { const [g, w] = r.split(":");
+    return g === "progress" ? "talks" : g === "none" ? "away" : w === "Paid only" ? "paid" : w === "Below their DR/DA bar" ? "bar" : "declined"; };
+  // Counts per kind, plus the reasons inside each. Companies with only an out-of-office come from the outcome summary,
+  // or, on data written before it counted them, from the "Others" list.
+  const breakdown = (o, c) => {
+    const n = Object.fromEntries(CATS.map(([k]) => [k, 0])), why = Object.fromEntries(CATS.map(([k]) => [k, {}]));
+    if (!o) return { n, why };
+    n.live = o.live || 0; n.agreed = (o.accepted || 0) - (o.live || 0);
+    for (const [r, v] of Object.entries(o.reasons || {})) { const k = catOf(r), w = r.split(":")[1]; n[k] += v; why[k][w] = (why[k][w] || 0) + v; }
+    const talks = (o.progress || 0) - Object.entries(o.reasons || {}).filter(([r]) => r.startsWith("progress:")).reduce((a, [, v]) => a + v, 0);
+    if (talks > 0) { n.talks += talks; why.talks.Talking = (why.talks.Talking || 0) + talks; }
+    if (o.none == null && c) {
+      const busy = new Set([...(c.list_reply || []), ...(c.list_waiting || []), ...(c.list_paid || []), ...(c.exchanges || []).map(x => ({ company: x.partner }))].map(x => x.company));
+      const away = new Set((c.list_others || []).filter(x => /out of office|bounced/i.test(x.reason || x.stage || "")).map(x => x.company)
+        .filter(co => !busy.has(co) && !(c.list_others || []).some(y => y.company === co && !/out of office|bounced/i.test(y.reason || y.stage || ""))));
+      n.away = away.size; if (away.size) why.away["Out of office"] = away.size;
+    }
+    return { n, why };
+  };
+  const catBar = (n, keys, h = 10) => { const t = keys.reduce((a, k) => a + (n[k] || 0), 0) || 1;
+    return el("div", { class: "obar cbar", style: `height:${h}px`, role: "img", "aria-label": CATS.filter(([k]) => keys.includes(k)).map(([k, l]) => `${l} ${n[k] || 0}`).join(", ") },
+      ...CATS.filter(([k]) => keys.includes(k) && n[k]).map(([k, l, col]) => el("i", { title: `${l} ${n[k]}`, class: k === "away" ? "away" : null, style: `width:${n[k] / t * 100}%;background:${col}` }))); };
+  const ALL = CATS.map(([k]) => k);
 
   function perf(box, trend) {
     const today = todayIST();
