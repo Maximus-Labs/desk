@@ -200,7 +200,7 @@ td.partner, td.co { color: var(--text); font-weight: 500 }
 .seg button[aria-selected="true"] { background: var(--raised); color: var(--text); box-shadow: inset 0 0 0 1px var(--line) }
 .seg button b { font-family: var(--mono); font-weight: 500; color: var(--text3); margin-left: 4px }
 .seg button[aria-selected="true"] b { color: var(--sky) }
-.scroll2 { overflow: auto }
+.scroll2 { overflow: auto } .scroll2.five { overflow-x: auto; overflow-y: auto }
 
 .top2 { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; align-items: start }
 .home-top { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: stretch }
@@ -423,7 +423,7 @@ table.led td.muted { color: var(--text3) }
           <div class="seg" role="tablist" aria-label="Outreach status" id="seg"></div>
         </div>
         <div class="st-tools"><p class="hint" id="st-hint"></p><button type="button" class="copy-btn" id="copy-ex" hidden>Copy table</button></div>
-        <div class="table-wrap">
+        <div class="table-wrap scroll2 five" id="st-wrap">
           <table>
             <thead id="st-head"></thead>
             <tbody id="st-body"></tbody>
@@ -588,6 +588,12 @@ table.led td.muted { color: var(--text3) }
 
   function homeOutcomes() { $("home-out").replaceChildren(); }   // replies live in the graph and on each card now
 
+  // Show the first five rows of a table; the rest scroll up and down under a fixed header.
+  const fiveRows = w => requestAnimationFrame(() => {
+    const rs = [...w.querySelectorAll("tbody tr")], h = w.querySelector("thead");
+    w.style.maxHeight = rs.length > 5 ? (h.offsetHeight + rs.slice(0, 5).reduce((a, r) => a + r.offsetHeight, 0) + 2) + "px" : "";
+  });
+
   function homeQueue(d) {
     const cs = d.clients.filter(c => !c.placeholder);
     $("home-queue").replaceChildren(el("div", { class: "queue" },
@@ -686,7 +692,7 @@ table.led td.muted { color: var(--text3) }
   };
 
   // Reply outcomes: what each company's reply means for an exchange.
-  const OUT = [["accepted", "Accepted", "#1fa067"], ["progress", "In progress", "#c8841f"], ["dropped", "Not going ahead", "#8a8a94"]];
+  const OUT = [["accepted", "Accepted", "#1fa067"], ["progress", "In progress", "#c8841f"], ["dropped", "Not going ahead", "#7a7a84"]];
   const outBar = (o, h = 10) => { const t = OUT.reduce((a, [k]) => a + ((o || {})[k] || 0), 0) || 1;
     return el("div", { class: "obar", style: `height:${h}px`, role: "img", "aria-label": OUT.map(([k, l]) => `${l} ${(o || {})[k] || 0}`).join(", ") },
       ...OUT.map(([k, , c]) => (o || {})[k] ? el("i", { style: `width:${o[k] / t * 100}%;background:${c}` }) : null)); };
@@ -744,17 +750,25 @@ table.led td.muted { color: var(--text3) }
       const days = (RANGES.find(r => r[0] === range) || RANGES[1])[2];
       const start = days ? addDays(today, -(days - 1)) : (keys[0] && keys[0] < today ? keys[0] : addDays(today, -6));
       const buckets = new Map();
-      for (let d = start; d <= today; d = addDays(d, 1)) { const k = bucketOf(d, group); if (!buckets.has(k)) buckets.set(k, [0, 0, 0, 0]); }
-      const totals = [0, 0, 0, 0];
+      const NC = 7 + ALL.length;   // every column of the data: the 4 metrics, then the reply groups and kinds
+      for (let d = start; d <= today; d = addDays(d, 1)) { const k = bucketOf(d, group); if (!buckets.has(k)) buckets.set(k, Array(NC).fill(0)); }
+      const totals = Array(NC).fill(0);
       for (const d of keys) {
         if (d < start || d > today) continue;
         const v = trend[d] || [], b = buckets.get(bucketOf(d, group));
         const val = i => i === 2 && rf !== "all" ? (v[RCOL[rf]] || 0) : (v[i] || 0);
-        for (let i = 0; i < 4; i++) { b[i] += val(i); totals[i] += val(i); }
+        for (let i = 0; i < NC; i++) { b[i] += val(i); totals[i] += val(i); }
       }
       const pts = [...buckets.entries()];
+      const split = keys.some(k => (trend[k] || []).length > 4);
+      const lineCol = c => c === "#050506" ? "#6b6b74" : c;   // the black of "Out of office" would vanish on the dark chart
+      const ser = [];
+      METRICS.forEach((m, i) => { if (!on[i]) return;
+        if (i === 2 && split) (rf === "all" ? RCH : RCH.filter(o => o[0] === rf)).forEach(([k, l, c]) => ser.push({ col: RCOL[k], color: lineCol(c), label: `Replies · ${l}`, scale: "r" }));
+        else ser.push({ col: i, color: m.color, label: m.label, scale: i }); });
+      const pick = RCH.find(o => o[0] === rf), tileCol = i => i === 2 && pick && !["declined", "away"].includes(rf) ? pick[2] : METRICS[i].color;
       const tiles = el("div", { class: "tiles" }, ...METRICS.map((m, i) => {
-        const t = el("button", { type: "button", class: "tile", "aria-pressed": String(on[i]), style: `--tc:${m.color}` },
+        const t = el("button", { type: "button", class: "tile", "aria-pressed": String(on[i]), style: `--tc:${tileCol(i)}` },
           el("span", { class: "tl" }, el("span", { class: "box", text: on[i] ? "✓" : "" }), i === 2 && rf !== "all" ? `Replies · ${RCH.find(o => o[0] === rf)[1]}` : m.label),
           el("span", { class: "tv", text: totals[i].toLocaleString("en-IN") }));
         t.onclick = () => { on[i] = !on[i]; if (!on.some(Boolean)) on[i] = true; draw(); }; return t;
@@ -770,15 +784,15 @@ table.led td.muted { color: var(--text3) }
         plot,
         el("div", { class: "perf-foot", text: "Companies and replies count each company once, on the first day it was emailed or replied. With more than one metric on, each line has its own scale." }));
       box.replaceChildren(card);
-      chart(plot, pts);
+      chart(plot, pts, ser);
     };
-    const chart = (plot, pts) => {
-      const W = Math.max(plot.clientWidth || 600, 280), H = 250, single = on.filter(Boolean).length === 1;
+    const chart = (plot, pts, ser) => {
+      const W = Math.max(plot.clientWidth || 600, 280), H = 250, single = new Set(ser.map(s => s.scale)).size === 1;
       const L = single ? 34 : 8, R = 10, T = 10, B = 26, iw = W - L - R, ih = H - T - B, n = pts.length;
       const x = i => L + (n === 1 ? iw / 2 : (i * iw) / (n - 1));
       const svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Performance chart" });
-      const act = METRICS.map((m, i) => i).filter(i => on[i]);
-      const max = act.map(i => niceMax(Math.max(0, ...pts.map(p => p[1][i]))));
+      const top = {}; for (const s of ser) top[s.scale] = Math.max(top[s.scale] || 0, ...pts.map(p => p[1][s.col]));   // reply kinds share one scale
+      const max = ser.map(s => niceMax(top[s.scale]));
       for (let g = 0; g <= 4; g++) {
         const y = T + ih - (g * ih) / 4;
         svg.append(sv("line", { x1: L, x2: W - R, y1: y, y2: y, class: g ? "grid" : "base" }));
@@ -790,14 +804,14 @@ table.led td.muted { color: var(--text3) }
         const t = sv("text", { x: x(i), y: H - 8, "text-anchor": n === 1 ? "middle" : i === 0 ? "start" : i === n - 1 ? "end" : "middle", class: "ax" });
         t.textContent = group === "month" ? `${MON[Number(k.slice(5, 7)) - 1].slice(0, 3)} ${k.slice(2, 4)}` : short(k); svg.append(t);
       });
-      act.forEach((i, j) => {
+      ser.forEach((s, j) => {
         const y = v => T + ih - (v / max[j]) * ih;
-        const d = pts.map((p, q) => `${q ? "L" : "M"}${x(q).toFixed(1)},${y(p[1][i]).toFixed(1)}`).join(" ");
-        svg.append(sv("path", { d, class: "ln", stroke: METRICS[i].color }));
-        if (n <= 14) pts.forEach((p, q) => svg.append(sv("circle", { cx: x(q), cy: y(p[1][i]), r: 3, fill: METRICS[i].color, stroke: "var(--surface)", "stroke-width": 2 })));
+        const d = pts.map((p, q) => `${q ? "L" : "M"}${x(q).toFixed(1)},${y(p[1][s.col]).toFixed(1)}`).join(" ");
+        svg.append(sv("path", { d, class: "ln", stroke: s.color }));
+        if (n <= 14) pts.forEach((p, q) => svg.append(sv("circle", { cx: x(q), cy: y(p[1][s.col]), r: 3, fill: s.color, stroke: "var(--surface)", "stroke-width": 2 })));
       });
       const xh = sv("line", { y1: T, y2: T + ih, class: "xh", visibility: "hidden" }); svg.append(xh);
-      const dots = act.map(i => { const c = sv("circle", { r: 4.5, fill: METRICS[i].color, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }); svg.append(c); return c; });
+      const dots = ser.map(s => { const c = sv("circle", { r: 4.5, fill: s.color, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }); svg.append(c); return c; });
       const hit = sv("rect", { x: L, y: T, width: iw, height: ih, fill: "transparent" }); svg.append(hit);
       const tip = el("div", { class: "tip", hidden: "" });
       const move = ev => {
@@ -805,8 +819,8 @@ table.led td.muted { color: var(--text3) }
         const q = n === 1 ? 0 : Math.max(0, Math.min(n - 1, Math.round(((px - L) / iw) * (n - 1))));
         const [k, v] = pts[q], cx = x(q);
         xh.setAttribute("x1", cx); xh.setAttribute("x2", cx); xh.setAttribute("visibility", "visible");
-        act.forEach((i, j) => { dots[j].setAttribute("cx", cx); dots[j].setAttribute("cy", T + ih - (v[i] / max[j]) * ih); dots[j].setAttribute("visibility", "visible"); });
-        tip.replaceChildren(el("b", { text: bucketLabel(k, group) }), ...METRICS.map((m, i) => on[i] ? el("div", {}, el("i", { style: `background:${m.color}` }), m.label, el("span", { text: String(v[i]) })) : null).filter(Boolean));
+        ser.forEach((s, j) => { dots[j].setAttribute("cx", cx); dots[j].setAttribute("cy", T + ih - (v[s.col] / max[j]) * ih); dots[j].setAttribute("visibility", "visible"); });
+        tip.replaceChildren(el("b", { text: bucketLabel(k, group) }), ...ser.map(s => el("div", {}, el("i", { style: `background:${s.color}` }), s.label, el("span", { text: String(v[s.col]) }))));
         tip.hidden = false;
         const left = (cx / W) * r.width, tw = tip.offsetWidth;
         tip.style.left = Math.max(0, Math.min(r.width - tw, left + (left > r.width / 2 ? -tw - 12 : 12))) + "px";
@@ -881,6 +895,7 @@ table.led td.muted { color: var(--text3) }
       $("copy-ex").hidden = key !== "completed" || !rows.length;
       $("st-head").replaceChildren(el("tr", {}, ...v.head.map(h => el("th", { text: h }))));
       $("st-body").replaceChildren(...(rows.length ? rows.map(x => el("tr", {}, ...(v.row ? v.row(x) : convRow(x, key)))) : [empty(v.head.length, v.empty)]));
+      fiveRows($("st-wrap"));
     };
     $("copy-ex").onclick = async () => {
       const cellv = v => String(v || "").replace(/[\t\n]+/g, " ");
