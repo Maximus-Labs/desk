@@ -194,6 +194,8 @@ body { margin: 0 }
 .card.refill { border-color: var(--line) }
 .client-one { display: grid; grid-template-columns: minmax(0, 520px) }
 td.partner, td.co { color: var(--text); font-weight: 500 }
+td.pgrp { vertical-align: top; border-right: 1px solid var(--line) } td.pgrp small { display: block; margin-top: 3px; font: 400 11.5px var(--mono); color: var(--text3) }
+#st-body tr.g0 td { border-top: 1px solid var(--line) }
 .seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface) }
 .seg button { font: inherit; font-size: 13px; font-weight: 500; color: var(--text2); background: transparent; border: 0; border-radius: var(--r-pill); padding: 6px 12px; cursor: pointer; white-space: nowrap }
 .seg button:hover { color: var(--text) }
@@ -873,10 +875,23 @@ table.led td.muted { color: var(--text3) }
   }
 
   const day = s => s ? s.slice(0, 10) : "–";
+  // Exchanges one per pair of pages (a sheet cell may hold several links, one per line), grouped by partner:
+  // partners with the most exchanges first, then the newest.
+  const exPairs = c => {
+    const urls = v => String(v || "").split(/\n+/).map(u => u.trim()).filter(Boolean);
+    const out = [];
+    for (const x of c.exchanges || []) { const t = urls(x.their_url), o = urls(x.our_url), n = Math.max(1, t.length, o.length);
+      for (let i = 0; i < n; i++) out.push({ ...x, their_url: t[i] || "", our_url: o[i] || "" }); }
+    const by = new Map(); for (const x of out) { if (!by.has(x.partner)) by.set(x.partner, []); by.get(x.partner).push(x); }
+    const gs = [...by.values()].map(g => g.sort((a, b) => (a.live || "").localeCompare(b.live || "")));
+    gs.sort((a, b) => b.length - a.length || (b.at(-1).live || "").localeCompare(a.at(-1).live || ""));
+    return gs.flatMap(g => g.map((x, i) => ({ ...x, _i: i, _n: g.length })));
+  };
   const VIEWS = [
     { key: "completed", label: "Completed", hint: "Each partner, the page that lists us, and the page where we listed them.",
       head: ["Partner", "Their page (lists us)", "Our page (lists them)", "Live since"], empty: "No completed link exchanges yet.",
-      rows: c => c.exchanges || [], row: x => [el("td", { class: "partner", text: x.partner }),
+      rows: exPairs, row: x => [x._i ? null : el("td", { class: "partner pgrp", rowspan: String(x._n) }, el("span", { text: x.partner }),
+          x._n > 1 ? el("small", { text: `${x._n} exchanges` }) : null),
         el("td", { class: "url" }, link(x.their_url), x.their_date ? el("small", { text: x.their_date }) : null),
         el("td", { class: "url" }, link(x.our_url), x.our_date ? el("small", { text: x.our_date }) : null),
         el("td", { class: "when num", text: x.live || "Earlier" })] },
@@ -908,13 +923,13 @@ table.led td.muted { color: var(--text3) }
       $("st-hint").textContent = v.hint;
       $("copy-ex").hidden = key !== "completed" || !rows.length;
       $("st-head").replaceChildren(el("tr", {}, ...v.head.map(h => el("th", { text: h }))));
-      $("st-body").replaceChildren(...(rows.length ? rows.map(x => el("tr", {}, ...(v.row ? v.row(x) : convRow(x, key)))) : [empty(v.head.length, v.empty)]));
+      $("st-body").replaceChildren(...(rows.length ? rows.map(x => el("tr", { class: x._i === 0 ? "g0" : null }, ...(v.row ? v.row(x) : convRow(x, key)).filter(Boolean))) : [empty(v.head.length, v.empty)]));
       fiveRows($("st-wrap"));
     };
     $("copy-ex").onclick = async () => {
       const cellv = v => String(v || "").replace(/[\t\n]+/g, " ");
       const tsv = [["Partner", "Their page (lists us)", "Their date", "Our page (lists them)", "Our date", "Live since"].join("\t"),
-        ...(c.exchanges || []).map(x => [x.partner, x.their_url, x.their_date, x.our_url, x.our_date, x.live].map(cellv).join("\t"))].join("\n");
+        ...exPairs(c).map(x => [x.partner, x.their_url, x.their_date, x.our_url, x.our_date, x.live].map(cellv).join("\t"))].join("\n");
       const b = $("copy-ex");
       try { await navigator.clipboard.writeText(tsv); }
       catch (e) { const t = el("textarea", {}); t.value = tsv; document.body.append(t); t.select(); document.execCommand("copy"); t.remove(); }
