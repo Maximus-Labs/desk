@@ -976,7 +976,9 @@ table.led td.muted { color: var(--text3) }
     });
   }
 
-  const cell = csv => { const t = csv.trim(); return t.startsWith('"') ? t.slice(1, -1).replace(/""/g, '"') : t; };
+  // The data may be split over several cells (one per CSV line); join them back. No trimming: a split can fall on a space.
+  const unq = l => l.startsWith('"') && l.endsWith('"') ? l.slice(1, -1).replace(/""/g, '"') : l;
+  const cell = csv => csv.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.length).map(unq).join("");
   fetch(DATA + (DATA.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" })
     .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
     .then(text => {
